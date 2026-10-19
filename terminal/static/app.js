@@ -920,6 +920,7 @@ async function overlayMajor(i, sec, rows) {
     const short = e.label ? clip(e.title.replace(/（.*?）/g, ""), 7) + (es.length > 1 ? ` +${es.length - 1}` : "") : "";
     if (e.kind === "move") mk.push({ time: t, position: e.dir > 0 ? "belowBar" : "aboveBar", color: e.dir > 0 ? UP : DN, shape: e.dir > 0 ? "arrowUp" : "arrowDown", text: short });
     else if (e.kind === "fomc") mk.push({ time: t, position: "belowBar", color: "#b48cff", shape: "square", text: "Fed" });
+    else if (e.kind === "cbc") mk.push({ time: t, position: "belowBar", color: "#3ad6d6", shape: "square", text: "央行" });
     else if (e.kind === "history") mk.push({ time: t, position: e.dir > 0 ? "belowBar" : "aboveBar", color: "#e6e6e6", shape: "circle", text: short });
     else mk.push({ time: t, position: "aboveBar", color: "#ffd166", shape: "circle", text: short });
   }
@@ -2681,7 +2682,7 @@ function holdPrompt(d) {
 
 
 /* ---------- 重大事件 */
-const EV_KIND_STYLE = { move: "ev-move", history: "ev-hist", fomc: "ev-fomc", manual: "ev-manual", world: "ev-world" };
+const EV_KIND_STYLE = { move: "ev-move", history: "ev-hist", fomc: "ev-fomc", cbc: "ev-cbc", manual: "ev-manual", world: "ev-world" };
 const WEEKDAY = "日一二三四五六";
 
 async function renderEvents(i, body, p) {
@@ -2689,7 +2690,7 @@ async function renderEvents(i, body, p) {
   const kind = p.evKind || "";
   const days = p.evDays || 365;
   const bar = h("div", { class: "ranges" });
-  [["", "全部"], ["history", "歷史大事"], ["move", "指數大波動"], ["fomc", "Fed 決策"], ["manual", "自訂"], ["world", "世界事件"]].forEach(([k, l]) =>
+  [["", "全部"], ["history", "歷史大事"], ["move", "指數大波動"], ["fomc", "Fed 決策"], ["cbc", "台灣央行"], ["manual", "自訂"], ["world", "世界事件"]].forEach(([k, l]) =>
     bar.append(h("button", { class: kind === k ? "on" : "", onclick: () => setPane(i, { evKind: k }) }, l)));
   bar.append(h("span", { class: "sep-s" }));
   [[183, "半年"], [365, "1 年"], [730, "2 年"], [1826, "5 年"], [3653, "10 年"]].forEach(([d, l]) =>
@@ -2764,12 +2765,12 @@ function evCard(i, e, p) {
       const more = h("button", { class: "mini", onclick: () => { hl.slice(3).forEach((n) => ul.append(evNewsLi(n))); more.remove(); } }, `更多新聞 ${hl.length - 3} 則`);
       main.append(more);
     }
-  } else if (["move", "fomc", "history"].includes(e.kind) && !e.news_at) main.append(h("div", { class: "muted ev-sum" }, "新聞與 AI 摘要在背景整理中…"));
+  } else if (["move", "fomc", "cbc", "history"].includes(e.kind) && !e.news_at) main.append(h("div", { class: "muted ev-sum" }, "新聞與 AI 摘要在背景整理中…"));
   if (!e.readonly) {
     const acts = h("div", { class: "ev-acts" });
-    const idx = mv.length ? mv[0][0] : "^TWII";
+    const idx = mv.length ? mv[0][0] : e.kind === "cbc" ? "TWD=X" : "^TWII";
     acts.append(h("button", { class: "mini", onclick: () => evOpenChart(i, idx, e.date) }, "看走勢"));
-    if (e.kind === "move" || e.kind === "fomc" || e.kind === "history")
+    if (["move", "fomc", "cbc", "history"].includes(e.kind))
       acts.append(h("button", { class: "mini", title: "重抓當時新聞，讓本機 Ollama 重新命名（你改過的標題不會被覆蓋）", onclick: async (ev) => {
         ev.target.disabled = true; ev.target.textContent = "AI 撰寫中…";
         try { await api(`/api/events/ai/${encodeURIComponent(e.id)}`, { method: "POST" }); } catch (x) { flash(x.message); }
@@ -3089,9 +3090,11 @@ async function renderTWFX(i, body, p) {
 async function fxChart(i, box, code, p) {
   box.classList.remove("hidden");
   const rng = p.fxRange || "1y";
+  const evOn = p.fxEv !== false, fcOn = !!p.fxFc, hz = p.fxH || 60;
   const bar = h("div", { class: "ranges" });
-  const area = h("div", { class: "mc-area" });
-  box.append(bar, area);
+  const legend = h("div", { class: "legend fx-legend" });
+  const area = h("div", { class: "mc-area chart-box" });
+  box.append(bar, legend, area);
   let d;
   try { d = await api(`/api/twfx/series?ccy=${code}&range=${rng}`); } catch (e) { area.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
   const u = d.unit || 1;
@@ -3100,17 +3103,92 @@ async function fxChart(i, box, code, p) {
   bar.append(h("b", { style: "color:var(--amber)" }, `${d.flag} ${u > 1 ? u + " " : ""}${d.name}（${code}）＝ ${fxFmt(last * u)} 台幣`),
     h("span", { class: cls(chg) }, chg == null ? "" : `　區間 ${chg > 0 ? "+" : ""}${nf(chg, 2)}%`),
     h("span", { class: "grow" }), ...[["1mo", "1 月"], ["3mo", "3 月"], ["6mo", "6 月"], ["1y", "1 年"], ["2y", "2 年"], ["5y", "5 年"], ["10y", "10 年"]].map(([k, l]) =>
-      h("button", { class: rng === k ? "on" : "", onclick: () => setPane(i, { fxRange: k }) }, l)));
+      h("button", { class: rng === k ? "on" : "", onclick: () => setPane(i, { fxRange: k }) }, l)),
+    h("button", { class: evOn ? "on mev-btn" : "mev-btn", title: "標出這個貨幣的異常波動日、Fed 與台灣央行利率決策、歷史大事", onclick: () => setPane(i, { fxEv: !evOn }) }, "📌 事件"),
+    h("button", { class: fcOn ? "on" : "", title: "TimesFM 統計預測（只看過去匯率）", onclick: () => setPane(i, { fxFc: !fcOn }) }, "🔮 預測"),
+    ...(fcOn ? [[20, "1 月"], [60, "3 月"], [120, "6 月"]].map(([n, l]) => h("button", { class: hz === n ? "on" : "", onclick: () => setPane(i, { fxH: n }) }, l)) : []));
   if (!d.points.length) { area.innerHTML = `<div class="empty">沒有資料</div>`; return; }
-  requestAnimationFrame(() => {
+  requestAnimationFrame(async () => {
     const chart = LightweightCharts.createChart(area, { ...chartTheme(), autoSize: true });
     const prec = last * u >= 100 ? 2 : last * u >= 10 ? 3 : last * u >= 1 ? 4 : 5;
-    const s = chart.addAreaSeries({ lineColor: cssVar("--amber"), topColor: "rgba(255,160,40,.25)", bottomColor: "rgba(255,160,40,0)", lineWidth: 2,
-      priceFormat: { type: "price", precision: prec, minMove: 1 / 10 ** prec } });
+    const pf = { type: "price", precision: prec, minMove: 1 / 10 ** prec };
+    const s = chart.addAreaSeries({ lineColor: cssVar("--amber"), topColor: "rgba(255,160,40,.25)", bottomColor: "rgba(255,160,40,0)", lineWidth: 2, priceFormat: pf });
     s.setData(d.points.map((x) => ({ time: x.time, value: x.value * u })));
     chart.timeScale().fitContent();
     S.charts.set(i, { chart, fit: () => chart.timeScale().fitContent() });
+    const tasks = [];
+    if (evOn) tasks.push(fxMarkers(i, chart, s, area, code, rng, d.points, legend));
+    if (fcOn) tasks.push(fxForecast(chart, code, hz, u, pf, legend));
+    await Promise.all(tasks);
   });
+}
+
+async function fxMarkers(i, chart, series, box, code, rng, pts, legend) {
+  let evs;
+  try { evs = await api(`/api/twfx/events?ccy=${code}&range=${rng}`); } catch (e) { return; }
+  const times = pts.map((x) => x.time);
+  const byTime = new Map();
+  for (const e of evs) {
+    const t = times.find((x) => x >= e.date);
+    if (!t) continue;
+    if (!byTime.has(t)) byTime.set(t, []);
+    byTime.get(t).push(e);
+  }
+  const UP = cssVar("--up"), DN = cssVar("--down");
+  const mk = [];
+  for (const [t, es] of byTime) {
+    const e = es.find((x) => x.kind === "fxmove") || es.find((x) => x.kind === "cbc") || es[0];
+    const more = es.length > 1 ? ` +${es.length - 1}` : "";
+    if (e.kind === "fxmove") mk.push({ time: t, position: e.dir > 0 ? "aboveBar" : "belowBar", color: e.dir > 0 ? UP : DN, shape: e.dir > 0 ? "arrowUp" : "arrowDown", text: clip(e.title, 9) + more });
+    else if (e.kind === "cbc") mk.push({ time: t, position: "belowBar", color: "#3ad6d6", shape: "square", text: "央行" + more });
+    else if (e.kind === "fomc") mk.push({ time: t, position: "belowBar", color: "#b48cff", shape: "square", text: "Fed" + more });
+    else mk.push({ time: t, position: "aboveBar", color: e.kind === "history" ? "#e6e6e6" : "#ffd166", shape: "circle", text: e.label ? clip(e.title.replace(/（.*?）/g, ""), 7) + more : "" });
+  }
+  mk.sort((a, b) => (a.time < b.time ? -1 : 1));
+  // crowded stretches (e.g. 2025-04): keep one text label per ~15 trading days on each side of the line
+  const lastAt = { aboveBar: -99, belowBar: -99 };
+  for (const m of mk) {
+    const k = times.indexOf(m.time);
+    if (m.shape === "square") continue;  // Fed／央行 tags are short — always shown
+    if (m.text && k - lastAt[m.position] < Math.max(8, Math.round(times.length / 40))) m.text = "";
+    else if (m.text) lastAt[m.position] = k;
+  }
+  series.setMarkers(mk);
+  const n = evs.filter((e) => e.kind === "fxmove").length;
+  legend.prepend(h("span", { class: "muted" }, `📌 異常波動 ${n} 次・Fed／央行 ${evs.filter((e) => e.kind === "fomc" || e.kind === "cbc").length} 次　`));
+  const tip = h("div", { class: "ev-tip hidden" });
+  box.append(tip);
+  chart.subscribeCrosshairMove((param) => {
+    const es = param && param.time ? byTime.get(tStr(param.time)) : null;
+    if (!es || !param.point) { tip.classList.add("hidden"); return; }
+    tip.innerHTML = es.map((e) => `<div><b>${esc(e.date)} ${esc(e.title)}</b>${e.summary ? `<div class="muted">${esc(e.summary)}</div>` : ""}</div>`).join("")
+      + (es.some((e) => e.kind !== "fxmove") ? `<div class="ev-hint">點一下看「大事」頁</div>` : "");
+    tip.classList.remove("hidden");
+    tip.style.left = Math.min(Math.max(8, param.point.x + 14), box.clientWidth - 300) + "px";
+    tip.style.top = Math.max(8, param.point.y - 20) + "px";
+  });
+  chart.subscribeClick((param) => {
+    const es = param && param.time ? (byTime.get(tStr(param.time)) || []).filter((e) => e.kind !== "fxmove") : [];
+    if (!es.length) return;
+    const el = paneEl(i);
+    if (el && el.classList.contains("maximized")) toggleMax(i);
+    setPane(otherPane(i, "EVENTS"), { fn: "EVENTS", evFocus: es[0].id });
+  });
+}
+
+async function fxForecast(chart, code, hz, u, pf, legend) {
+  const span = h("span", {}, "TimesFM 預測中…");
+  legend.append(span);
+  let d;
+  try { d = await api(`/api/forecast?s=${encodeURIComponent("TWFX:" + code)}&h=${hz}`); }
+  catch (e) { span.innerHTML = `<span class="down">預測失敗：${esc(e.message).slice(0, 80)}</span>`; return; }
+  const k = (v) => v * u;
+  const scaled = { ...d, last: k(d.last), forecast: d.forecast.map((x) => ({ ...x, median: k(x.median), p10: k(x.p10), p90: k(x.p90) })) };
+  drawForecast(chart, scaled);
+  const sm = d.summary;
+  span.innerHTML = `🔮 ${esc(d.model)} ${d.horizon} 個交易日：中位數 <b class="${cls(sm.change_pct)}">${fxFmt(k(sm.median_end))}（${pct(sm.change_pct)}）</b>
+    · 80% 區間 ${fxFmt(k(sm.p10_end))}–${fxFmt(k(sm.p90_end))} · 外幣升值機率 ${Math.round(sm.p_up * 100)}%`;
+  span.title = "TimesFM 只根據過去匯率做統計預測，不含央行政策、資金流與新聞；色帶是 P10–P90（80%）區間。匯率接近隨機漫步，區間比中位數更有參考價值。";
 }
 
 boot();

@@ -596,6 +596,7 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .ev-tag { font-size: 10.5px; padding: 0 5px; border: 1px solid var(--line-2); color: var(--muted); }
 .ev-tag.ev-move { color: var(--amber); border-color: var(--amber-dim); }
 .ev-tag.ev-fomc { color: #b48cff; border-color: #4b3a6e; }
+.ev-tag.ev-cbc { color: #3ad6d6; border-color: #1f5a5a; }
 .ev-tag.ev-manual { color: #ffd166; border-color: #4a3c14; }
 .ev-tag.ev-world { color: var(--cyan); border-color: #1d3a3a; }
 .ev-ai { font-size: 9.5px; color: #000; background: var(--cyan); padding: 0 4px; }
@@ -681,3 +682,5 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .fx-tbl td:nth-child(n+2), .fx-tbl th:nth-child(n+2) { text-align: right; }
 .fx-tbl td:last-child svg { width: 100%; }
 .fx-src { padding: 8px; font-size: 11px; }
+.fx-legend { padding: 2px 8px; font-size: 12px; min-height: 18px; }
+.mc-area.chart-box { position: relative; }

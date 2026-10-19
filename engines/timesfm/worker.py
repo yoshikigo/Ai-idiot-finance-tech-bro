@@ -99,6 +99,14 @@ def series_for(sym: str, context: int) -> tuple[pd.Series, str, str]:
         pts = funds.history(fid)["points"]
         s = pd.Series([p[1] for p in pts], index=pd.to_datetime([p[0] for p in pts]))
         return s.tail(context), f["name"], "B"
+    if sym.startswith("TWFX:"):  # TWD per 1 unit of a foreign currency (cross rate)
+        from ft_common import fx
+        code = sym[5:].upper()
+        if code not in fx.CCY:
+            raise ValueError(f"不支援的幣別 {code}")
+        yrs = max(2, math.ceil(context / 240) + 1)
+        s = fx.series(code, "2y" if yrs <= 2 else "5y" if yrs <= 5 else "10y")
+        return s.tail(context), f"{fx.CCY[code][0]}兌台幣", "B"
     years = max(2, math.ceil(context / 240) + 1)
     df = market.history(sym, start=(dt.date.today() - dt.timedelta(days=int(365.25 * years))).isoformat())
     if df is None or len(df) == 0:

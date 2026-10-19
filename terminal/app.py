@@ -765,6 +765,28 @@ def api_twfx_series(ccy: str, range: str = "1y"):  # noqa: A002
     return {"code": ccy.upper(), "name": name, "flag": flag, "unit": fx.UNIT.get(ccy.upper(), 1), "points": pts}
 
 
+@app.get("/api/twfx/events")
+def api_twfx_events(ccy: str, range: str = "1y"):  # noqa: A002
+    """Chart markers for one currency: its own unusual days vs TWD + Fed / 台灣央行 / history / your events."""
+    code = ccy.upper()
+    if code not in fx.CCY:
+        raise HTTPException(404, "不支援的幣別")
+    period = range if range in ("1mo", "3mo", "6mo", "1y", "2y", "5y", "10y") else "1y"
+    days = {"1mo": 31, "3mo": 92, "6mo": 183, "1y": 366, "2y": 731, "5y": 1827, "10y": 3653}[period]
+    import datetime as _dt
+    since = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
+    try:
+        mv = fx.moves(code, period if days >= 731 else "2y")
+    except Exception:  # noqa: BLE001
+        mv = []
+    name = fx.CCY[code][0]
+    out = [{"id": f"fxmove:{code}:{m['date']}", "date": m["date"], "kind": "fxmove", "dir": m["dir"], "label": True,
+            "title": f"{name}{'升' if m['dir'] > 0 else '貶'} {abs(m['pct']):.2f}%（{m['sigma']}σ）",
+            "summary": f"單日 {name}兌台幣 {m['pct']:+.2f}%，約 {m['sigma']} 倍近 60 日波動"} for m in mv if m["date"] >= since]
+    out += events.markers(since, None, f"TWFX:{code}")
+    return sorted(out, key=lambda e: e["date"])
+
+
 @app.get("/api/macro")
 def api_macro(ids: str = ""):
     rows = fred.snapshot([x for x in ids.split(",") if x] or None)

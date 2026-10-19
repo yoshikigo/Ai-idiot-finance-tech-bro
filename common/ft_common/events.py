@@ -33,7 +33,11 @@ INDEXES = {"^TWII": ("加權", 2.0, 6.0), "^GSPC": ("S&P 500", 1.8, 5.0), "^IXIC
 SIGMA_K = 2.5
 FOMC = ["2025-01-29", "2025-03-19", "2025-05-07", "2025-06-18", "2025-07-30", "2025-09-17", "2025-10-29", "2025-12-10",
         "2026-01-28", "2026-03-18", "2026-04-29", "2026-06-17", "2026-07-29", "2026-09-16", "2026-10-28", "2026-12-09"]
-KINDS = {"move": "市場大波動", "history": "歷史大事", "fomc": "Fed 利率決策", "manual": "自訂", "world": "世界事件"}
+# 台灣央行理監事聯席會議（每季，週四）。2025-12-18、2026-06-18、2026-09-17 經新聞／央行新聞稿確認；
+# 其他依往例（每季第 3 個週四）推估——不對的話在「大事」頁改日期即可（使用者修改不會被覆蓋）。
+CBC = ["2025-03-20", "2025-06-19", "2025-09-18", "2025-12-18", "2026-03-19", "2026-06-18", "2026-09-17", "2026-12-17"]
+KINDS = {"move": "市場大波動", "history": "歷史大事", "fomc": "Fed 利率決策", "cbc": "台灣央行理監事會", "manual": "自訂",
+         "world": "世界事件"}
 
 # Well-documented market-moving events since 2020 (built-in list; dates are the day markets reacted).
 # Later events come from detection + headlines. Edit freely — user edits in the UI are never overwritten.
@@ -247,6 +251,9 @@ def refresh(period: str | None = None) -> dict:
             if not c.execute("SELECT 1 FROM events WHERE id=?", (eid,)).fetchone():
                 c.execute("INSERT INTO events(id,date,kind,auto_title,created,updated) VALUES(?,?,?,?,?,?)",
                           (eid, d, "fomc", "Fed 利率決策（FOMC）", now, now))
+        for d in CBC:
+            c.execute("INSERT OR IGNORE INTO events(id,date,kind,auto_title,created,updated) VALUES(?,?,?,?,?,?)",
+                      (f"cbc:{d}", d, "cbc", "台灣央行理監事會", now, now))
     return {"detected": len(found), "history": len(HISTORY), "period": period,
             "since": min((str(v.index[0]) for v in closes.values()), default=None), "at": now}
 
@@ -266,7 +273,8 @@ def _row(c, eid: str) -> dict | None:
 def fetch_headlines(e: dict) -> list[dict]:
     start = dt.date.fromisoformat(e["date"]) - dt.timedelta(days=1)
     end_d = dt.date.fromisoformat(max([e["date"]] + [m["date"] for m in e.get("moves", {}).values()])) + dt.timedelta(days=2)
-    q = "聯準會 OR Fed OR 利率 OR 美股" if e["kind"] == "fomc" else NEWS_Q
+    q = ("聯準會 OR Fed OR 利率 OR 美股" if e["kind"] == "fomc" else
+         "央行 理監事會 OR 利率 OR 新台幣" if e["kind"] == "cbc" else NEWS_Q)
     try:
         rows = twmarket.news_between(q, start.isoformat(), end_d.isoformat(), 15)
     except Exception as e2:  # noqa: BLE001
@@ -290,7 +298,7 @@ AI_SYSTEM = ("你是財經編輯。根據提供的指數變動與「當時的新
 def enrich(eid: str, llm: dict | None, *, news: bool = True, ai: bool = True) -> dict | None:
     with _conn() as c:
         e = _row(c, eid)
-    if not e or e["kind"] not in ("move", "fomc", "history"):
+    if not e or e["kind"] not in ("move", "fomc", "cbc", "history"):
         return e
     if news and not e.get("news_at"):
         e["headlines"] = fetch_headlines(e)
@@ -321,7 +329,7 @@ def pending(limit: int = 50) -> list[str]:
     today = (dt.date.today() - dt.timedelta(days=2)).isoformat()
     with _conn() as c:
         return [r[0] for r in c.execute(
-            "SELECT id FROM events WHERE kind IN ('move','fomc','history') AND date<=? AND date>=? AND (news_at IS NULL OR "
+            "SELECT id FROM events WHERE kind IN ('move','fomc','cbc','history') AND date<=? AND date>=? AND (news_at IS NULL OR "
             "(kind='move' AND ai_at IS NULL)) AND hidden=0 ORDER BY score DESC, date DESC LIMIT ?",
             (today, (dt.date.today() - dt.timedelta(days=int(os.environ.get("FT_EVENTS_ENRICH_DAYS", "4000")))).isoformat(), limit))]
 
@@ -378,7 +386,9 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
     On one of the tracked indices only that index's own big moves are shown; on anything else the `top`
     strongest market-wide events in the window. The strongest `top` also get `label=True` (text on the chart);
     the rest are drawn as bare arrows so a volatile year stays readable."""
-    rows = list_events(since, until or dt.date.today().isoformat(), ["move", "history", "fomc", "manual"], world_too=False)
+    fx = symbol.startswith("TWFX:")  # currency charts: central banks + history; index moves don't belong there
+    rows = list_events(since, until or dt.date.today().isoformat(),
+                       ["history", "fomc", "cbc", "manual"] if fx else ["move", "history", "fomc", "cbc", "manual"], world_too=False)
     years = max(1.0, (dt.date.fromisoformat((until or dt.date.today().isoformat())[:10]) - dt.date.fromisoformat(since[:10])).days / 365)
     moves = [e for e in rows if e["kind"] == "move"]
     if symbol in INDEXES:
@@ -386,8 +396,8 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
         moves = sorted(moves, key=lambda e: -abs(e["moves"].get(symbol, {}).get("pct", 0)))[:int(min(40, max(15, 6 * years)))]
     else:
         moves = sorted(moves, key=lambda e: -e["score"])[:int(top * min(years, 3))]
-    if years > 3:  # long charts: Fed days would bury everything else
-        rows = [e for e in rows if e["kind"] != "fomc"]
+    if years > 3:  # long charts: Fed / central-bank days would bury everything else
+        rows = [e for e in rows if e["kind"] not in ("fomc", "cbc")]
     n_lab = top if years <= 3 else 5  # long charts: built-in history events carry the labels
     strong = {e["id"] for e in sorted(moves, key=lambda e: -(e["moves"].get(symbol, {}).get("pct", 0) ** 2 or e["score"]))[:n_lab]}
     keep = moves + [e for e in rows if e["kind"] != "move"]

@@ -61,3 +61,50 @@ def test_api_and_agent(tmp_path, monkeypatch):
     assert c.get("/api/twfx/series", params={"ccy": "XXX"}).status_code == 404
     t = c.get("/api/agent/twfx", params={"q": "USD,JPY"}).text
     assert "新台幣匯率" in t and "100 JPY" in t and "歐元" not in t
+
+
+def test_fx_moves_detects_unusual_days(monkeypatch):
+    import numpy as np
+    from ft_common import fx
+    idx = pd.bdate_range("2025-01-01", periods=300)
+    r = np.full(300, 0.0005) * np.where(np.arange(300) % 2, 1, -1)
+    r[200] = 0.02    # +2 % (≫ 3σ) → 外幣升
+    r[202] = -0.012  # within 3 days of the first → same episode, weaker → dropped
+    r[260] = -0.015  # separate episode → 外幣貶
+    s = pd.Series(30 * np.cumprod(1 + r), index=idx)
+    monkeypatch.setattr(fx, "series", lambda code, period="1y": s)
+    mv = fx.moves("JPY")
+    assert [m["date"] for m in mv] == [idx[200].strftime("%Y-%m-%d"), idx[260].strftime("%Y-%m-%d")]
+    assert mv[0]["dir"] == 1 and mv[1]["dir"] == -1 and mv[0]["sigma"] > 3
+
+
+def test_twfx_events_and_forecast_series(tmp_path, monkeypatch):
+    monkeypatch.setenv("FT_DATA", str(tmp_path))
+    from ft_common import events, fred, market, twmarket
+    monkeypatch.setattr(market, "FAKE", True)
+    monkeypatch.setattr(twmarket, "FAKE", True)
+    monkeypatch.setattr(fred, "fed_decision", lambda d: None)
+    monkeypatch.setattr(events, "load_closes", lambda period: {})
+    events.refresh("2y")
+    rows = {e["id"]: e for e in events.list_events("2025-01-01", "2027-01-01", ["cbc"], world_too=False)}
+    assert "cbc:2026-09-17" in rows and rows["cbc:2026-09-17"]["kind_name"] == "台灣央行理監事會"
+    sys.path.insert(0, str(ROOT / "terminal"))
+    import importlib
+
+    import app as appmod
+    importlib.reload(appmod)
+    from fastapi.testclient import TestClient
+    c = TestClient(appmod.app)
+    ev = c.get("/api/twfx/events", params={"ccy": "USD", "range": "2y"}).json()
+    kinds = {e["kind"] for e in ev}
+    assert {"cbc", "fomc"} <= kinds and "move" not in kinds  # index moves don't belong on a currency chart
+    assert c.get("/api/twfx/events", params={"ccy": "XXX"}).status_code == 404
+    # TimesFM accepts TWFX:<code> as a series
+    import importlib.util
+    spec = importlib.util.spec_from_file_location("tfm_worker", ROOT / "engines" / "timesfm" / "worker.py")
+    tfw = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(tfw)
+    s, name, freq = tfw.series_for("TWFX:JPY", 300)
+    assert len(s) == 300 and name == "日圓兌台幣" and 0.1 < s.iloc[-1] < 0.4
+    with pytest.raises(ValueError):
+        tfw.series_for("TWFX:XXX", 300)

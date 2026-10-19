@@ -119,6 +119,33 @@ def history(code: str, period: str = "1y") -> list[dict]:
     return [{"time": t.strftime("%Y-%m-%d"), "value": round(float(v), 6)} for t, v in s.items() if math.isfinite(v)]
 
 
+# ------------------------------------------------------------------ big moves of one currency vs TWD
+FLOOR = {"USD": 0.6, "HKD": 0.6, "CNY": 0.8, "MOP": 0.6, "SAR": 0.6, "AED": 0.6}  # pegged-ish / calm pairs
+
+
+def moves(code: str, period: str = "2y", top: int = 30) -> list[dict]:
+    """Days the currency moved unusually against TWD: |daily %| ≥ max(floor, 3σ of the past 60 days).
+    Moves within 3 days are one episode (the strongest day is kept)."""
+    s = series(code, period)
+    if len(s) < 70:
+        return []
+    r = s.pct_change() * 100
+    sd = r.rolling(60, min_periods=40).std().shift(1)
+    floor = FLOOR.get(code.upper(), 1.0)
+    hit = r[(r.abs() >= (3 * sd).clip(lower=floor)) & sd.notna()]
+    out: list[dict] = []
+    for t, v in hit.items():
+        if out and (t - pd.Timestamp(out[-1]["date"])).days <= 3:
+            if abs(v) > abs(out[-1]["pct"]):
+                out[-1].update(date=t.strftime("%Y-%m-%d"), pct=round(float(v), 2))
+            continue
+        out.append({"date": t.strftime("%Y-%m-%d"), "pct": round(float(v), 2)})
+    for m in out:
+        m["dir"] = 1 if m["pct"] > 0 else -1
+        m["sigma"] = round(abs(m["pct"]) / float(sd.get(pd.Timestamp(m["date"]), 0) or 1), 1)
+    return sorted(sorted(out, key=lambda m: -abs(m["pct"]))[:top], key=lambda m: m["date"])
+
+
 # ------------------------------------------------------------------ Bank of Taiwan board rates
 def parse_bot(text: str) -> dict[str, dict]:
     """rate.bot.com.tw flcsv: CODE,本行買入,現金,即期,遠期…,本行賣出,現金,即期,遠期…"""
