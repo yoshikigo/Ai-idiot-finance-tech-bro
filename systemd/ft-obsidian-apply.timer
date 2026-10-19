@@ -1,0 +1,9 @@
+[Unit]
+Description=FT Terminal: retry moving AI notes into the vault (drive mounted later, missed events)
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

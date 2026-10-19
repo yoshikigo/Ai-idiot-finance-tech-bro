@@ -1,0 +1,20 @@
+# podman build -t localhost/ft-finrl:latest -f engines/finrl/Containerfile .
+# CPU-only torch (small MLP policies train fine on CPU; keeps the GPU free for Ollama).
+FROM docker.io/library/python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.14.*"
+COPY engines/finrl/requirements.lock /tmp/req.lock
+RUN pip install -r /tmp/req.lock
+# FinRL's top-level __init__ imports alpaca/elegantrl/ray trading stacks we don't need;
+# use the library source directly with an empty package __init__.
+ARG UPSTREAM_REF=8511e7c15fbe1fbe5eb25e9f89932ac1ecd546a0
+RUN git init -q /opt/FinRL && cd /opt/FinRL \
+ && git remote add origin https://github.com/AI4Finance-Foundation/FinRL.git \
+ && git fetch -q --depth 1 origin ${UPSTREAM_REF} && git checkout -q FETCH_HEAD \
+ && : > finrl/__init__.py && rm -rf .git examples docs figs
+COPY common /app/common
+COPY engines/finrl /app/engine
+ENV PYTHONPATH=/app/common:/app/engine:/opt/FinRL FT_DATA=/data UPSTREAM_REF=${UPSTREAM_REF} MPLBACKEND=Agg
+WORKDIR /app/engine
+CMD ["python", "worker.py"]

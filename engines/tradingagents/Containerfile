@@ -1,0 +1,13 @@
+# podman build -t localhost/ft-tradingagents:latest -f engines/tradingagents/Containerfile .
+FROM docker.io/library/python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY engines/tradingagents/requirements.lock /tmp/req.lock
+RUN pip install -r /tmp/req.lock
+ARG UPSTREAM_REF=e8f5503e9b86d5c2710b0c76b1f686703968c9df
+RUN pip install --no-deps "git+https://github.com/TauricResearch/TradingAgents.git@${UPSTREAM_REF}"
+COPY common /app/common
+COPY engines/tradingagents /app/engine
+ENV PYTHONPATH=/app/common:/app/engine FT_DATA=/data UPSTREAM_REF=${UPSTREAM_REF}
+WORKDIR /app/engine
+CMD ["python", "worker.py"]

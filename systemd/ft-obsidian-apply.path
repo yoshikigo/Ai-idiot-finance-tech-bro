@@ -1,0 +1,9 @@
+[Unit]
+Description=FT Terminal: watch the Obsidian outbox
+
+[Path]
+PathChanged=@DATA_ROOT@/data/obsidian-outbox/.ft-stamp
+MakeDirectory=no
+
+[Install]
+WantedBy=default.target

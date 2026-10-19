@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FT 金融終端</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='4' fill='%23000'/%3E%3Cpath d='M6 24 L12 14 L17 19 L26 8' stroke='%23ffa028' stroke-width='3' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<div id="app">
+  <header id="topbar">
+    <div class="brand"><span class="logo">FT</span><span class="brand-sub">金融終端</span></div>
+    <form id="cmdform" autocomplete="off">
+      <span class="pane-target" id="paneTarget" title="指令作用的視窗">1</span>
+      <span class="yellow-key" id="sectorKey">股票</span>
+      <input id="cmd" spellcheck="false" placeholder="輸入：台積電 · 0056 概況 · ETF · 基金 安聯 · 台股 · 分析 2330 · 問 台積電展望？（說明 看全部）">
+      <button type="submit" class="go">執行</button>
+      <div id="suggest" class="suggest hidden"></div>
+    </form>
+    <div class="clocks" id="clocks"></div>
+    <button class="icon-btn" id="userBtn" title="我的持股（登入）">👤 登入</button>
+    <button class="icon-btn" id="toggleSide" title="AI 側欄（Ctrl+B）">AI ▸</button>
+  </header>
+
+  <nav id="fkeys"></nav>
+
+  <main id="main">
+    <section id="panes"></section>
+    <div id="resizer" title="拖曳調整寬度"></div>
+    <aside id="side">
+      <div class="side-tabs" id="sideTabs"></div>
+      <div class="side-body" id="sideBody"></div>
+    </aside>
+  </main>
+
+  <footer id="tape"><div class="tape-inner" id="tapeInner"></div><div class="status" id="status"></div></footer>
+</div>
+
+<script src="/static/vendor/lightweight-charts.standalone.production.js"></script>
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>

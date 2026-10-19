@@ -1,0 +1,5 @@
+tests/
+**/__pycache__/
+**/*.pyc
+*.tar.gz
+README.md

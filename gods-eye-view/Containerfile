@@ -1,0 +1,19 @@
+# God's Eye View (github.com/bilawalsidhu/gods-eye-view, MIT) — the app IS its Vite dev server:
+# it serves the globe and runs the provider proxies + the local MCP endpoint (/mcp) as middleware.
+#   podman build -t localhost/gods-eye-view:latest -f gods-eye-view/Containerfile .
+FROM docker.io/library/node:24.14.0-slim
+ENV PUPPETEER_SKIP_DOWNLOAD=1
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+ARG GEV_REF=93ea088f4556a5a65b3292a2d15142d5a6c562bc
+WORKDIR /app
+RUN chown node:node /app
+USER node
+RUN git init -q . && git remote add origin https://github.com/bilawalsidhu/gods-eye-view.git \
+ && git fetch -q --depth 1 origin ${GEV_REF} && git checkout -q FETCH_HEAD && rm -rf .git \
+ && npm ci --no-audit --no-fund \
+ && mkdir -p node_modules/.vite .gev-cache .gev-logs && chmod 777 node_modules/.vite
+# Loopback only: tailscale serve publishes it to the tailnet. Provider Settings never trusts a
+# proxied request, so keys come from the EnvironmentFile, not the in-app panel.
+ENV HOST=127.0.0.1 PORT=4173 GEV_KEY_SETUP_TRUSTED_PEERS=none UPSTREAM_REF=${GEV_REF}
+EXPOSE 4173
+CMD ["./node_modules/.bin/vite"]

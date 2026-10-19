@@ -1,0 +1,31 @@
+[Unit]
+Description=God's Eye View – live public-data globe + MCP (world events for FT Terminal)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Container]
+Image=localhost/gods-eye-view:latest
+ContainerName=gods-eye-view
+Network=host
+# container user node(1000) = you on the host, so caches on the external drive stay yours
+UserNS=keep-id:uid=1000,gid=1000
+EnvironmentFile=%h/.config/fin-terminal/gods-eye-view.env
+Environment=HOST=127.0.0.1 PORT=4173 GEV_KEY_SETUP_TRUSTED_PEERS=none
+Volume=@DATA_ROOT@/gods-eye-view/gev-cache:/app/.gev-cache
+Volume=@DATA_ROOT@/gods-eye-view/gev-logs:/app/.gev-logs
+Volume=/etc/localtime:/etc/localtime:ro
+PodmanArgs=--memory=3g
+HealthCmd=node -e "fetch('http://127.0.0.1:4173/mcp',{method:'POST',headers:{'content-type':'application/json'},body:'{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"ping\"}'}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+HealthInterval=60s
+HealthStartPeriod=90s
+HealthRetries=3
+
+[Service]
+ExecStartPre=/usr/bin/test -f @DATA_ROOT@/.ft-root
+Restart=always
+RestartSec=30
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

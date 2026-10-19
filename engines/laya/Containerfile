@@ -1,0 +1,24 @@
+# Laya trading judgement (receptron/laya → ONNX Runtime CPU) + the shared Python engine framework.
+#   podman build -t localhost/ft-laya:latest -f engines/laya/Containerfile .
+# The model (convaiinnovations/laya, ~1.7 GB fp32, Apache-2.0) downloads from Hugging Face on first
+# start into /data/laya (= <data root>/data/laya on the host), then loads in a few seconds.
+FROM docker.io/library/node:24.14.0-slim AS sidecar
+WORKDIR /sidecar
+COPY engines/laya/sidecar/package.json engines/laya/sidecar/package-lock.json ./
+# CPU binaries ship inside onnxruntime-node; skip its optional CUDA download from nuget
+ENV ONNXRUNTIME_NODE_INSTALL=skip
+RUN npm ci --omit=dev --no-audit --no-fund
+COPY engines/laya/sidecar/server.mjs ./
+
+FROM docker.io/library/python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+COPY --from=sidecar /usr/local/bin/node /usr/local/bin/node
+COPY terminal/requirements.lock /tmp/req.lock
+RUN pip install -r /tmp/req.lock
+ARG UPSTREAM_REF=@receptron/laya@0.2.0
+COPY common /app/common
+COPY engines/laya /app/engine
+COPY --from=sidecar /sidecar /app/engine/sidecar
+ENV PYTHONPATH=/app/common:/app/engine FT_DATA=/data UPSTREAM_REF=${UPSTREAM_REF} LAYA_CACHE=/data/laya LAYA_PRELOAD=1
+WORKDIR /app/engine
+CMD ["python", "worker.py"]

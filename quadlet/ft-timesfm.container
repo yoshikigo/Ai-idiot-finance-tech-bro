@@ -1,0 +1,28 @@
+[Unit]
+Description=Fin Terminal engine – TimesFM trend forecast (CPU)
+After=network-online.target
+StartLimitIntervalSec=0
+Wants=network-online.target
+
+[Container]
+Image=localhost/ft-timesfm:latest
+ContainerName=ft-timesfm
+Network=host
+EnvironmentFile=%h/.config/fin-terminal/fin-terminal.env
+Environment=FT_PORT=8136 FT_BIND=127.0.0.1 FT_DATA=/data
+Volume=@DATA_ROOT@/data:/data
+Volume=/etc/localtime:/etc/localtime:ro
+PodmanArgs=--memory=6g
+HealthCmd=python -c "import urllib.request,sys; urllib.request.urlopen('http://127.0.0.1:8136/health', timeout=5)"
+HealthInterval=60s
+HealthStartPeriod=60s
+HealthRetries=3
+
+[Service]
+ExecStartPre=/usr/bin/test -f @DATA_ROOT@/.ft-root
+Restart=always
+RestartSec=10
+TimeoutStartSec=300
+
+[Install]
+WantedBy=default.target

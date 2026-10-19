@@ -1,0 +1,7 @@
+[Unit]
+Description=FT Terminal: move AI notes into the Obsidian vault
+
+[Service]
+Type=oneshot
+EnvironmentFile=-%h/.config/fin-terminal/obsidian.env
+ExecStart=%h/.local/share/fin-terminal/ft-obsidian-apply.sh

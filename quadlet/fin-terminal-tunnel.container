@@ -1,0 +1,22 @@
+[Unit]
+Description=Cloudflare Tunnel → fin-terminal (public hostname set in Cloudflare Zero Trust)
+After=network-online.target fin-terminal.service
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Container]
+Image=docker.io/cloudflare/cloudflared:latest
+ContainerName=fin-terminal-tunnel
+# host network so the tunnel reaches the terminal on 127.0.0.1:8130 (it only listens on loopback)
+Network=host
+Secret=fin-terminal-tunnel-token,type=env,target=TUNNEL_TOKEN
+Exec=tunnel --no-autoupdate --metrics 127.0.0.1:20248 run
+NoNewPrivileges=true
+ReadOnly=true
+
+[Service]
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

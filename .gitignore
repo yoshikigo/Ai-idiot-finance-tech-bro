@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+*.sqlite
+*.sqlite-*
+.env
+*.env
+!config/*.env.example
+node_modules/
