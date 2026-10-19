@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from ft_common import context, edgar, events, focus, fred, funds, ledger, notes, supplychain, twmarket, world
+from ft_common import context, edgar, events, focus, fred, funds, fx, ledger, notes, supplychain, twmarket, world
 
 router = APIRouter(prefix="/api/agent")
 _hooks: dict = {}  # set by app.py: settings loader, llm block, engines map
@@ -221,6 +221,13 @@ def ledger_text(plain: bool = False, format: str = "text"):  # noqa: A002
 def macro_text(plain: bool = False, format: str = "text"):  # noqa: A002
     """美國總經（FRED）：利率、殖利率曲線、通膨、就業、景氣、金融情勢。"""
     return _out(fred.text(), plain, None, format)
+
+
+@router.get("/twfx")
+def twfx_text(q: str = "", plain: bool = False, format: str = "text"):  # noqa: A002
+    """新台幣匯率：1 外幣 = 多少台幣，日／月／年變動。q 可指定幣別（例：USD,JPY,EUR）。"""
+    codes = [c.strip().upper() for c in q.replace("，", ",").split(",") if c.strip().upper() in fx.CCY] or None
+    return _out(fx.text(codes), plain, None, format)
 
 
 @router.get("/sec")

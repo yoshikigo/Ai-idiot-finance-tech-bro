@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.9.0
+version: 0.10.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -175,6 +175,17 @@ class Tools:
         """
         await self._status(__event_emitter__, "FRED 總經")
         out = await self._get("macro", {}, timeout=120)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def twd_exchange_rates(self, currencies: str = "", __event_emitter__: Emitter = None) -> str:
+        """
+        新台幣匯率：1 外幣＝多少台幣（美元、日圓、人民幣、歐元、港幣、英鎊、韓元、新加坡幣、澳幣、泰銖…共 30 多種），含日／1 月／1 年變動。
+        :param currencies: 幣別代碼，逗號分隔（例 "USD,JPY"）；空白＝主要幣別
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, "台幣匯率")
+        out = await self._get("twfx", {"q": currencies}, timeout=120)
         await self._status(__event_emitter__, "完成", True)
         return out
 

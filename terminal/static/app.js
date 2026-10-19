@@ -62,11 +62,11 @@ const STOCK_FNS = ["GP", "GIP", "DES", "N", "FA", "LAYA"];
 const ETF_FNS = ["GP", "GIP", "ETF", "N", "LAYA"];
 const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: "財報", ETF: "ETF 資料", LAYA: "⚖ 判斷" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
-const MON_TITLE = { MACRO: "美國總經（FRED）", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
+const MON_TITLE = { TWFX: "台幣匯率", MACRO: "美國總經（FRED）", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
 const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings" };
 const ZH_CMD = { "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
   "持股": "HOLD", "我的持股": "HOLD", "庫存": "HOLD", "登入": "HOLD", "走勢": "GP", "K線": "GP", "線圖": "GP", "盤中": "GIP", "概況": "DES", "資料": "DES", "新聞": "N", "財報": "FA",
-  "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "FX", "商品": "CMDTY", "原物料": "CMDTY",
+  "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "TWFX", "台幣": "TWFX", "台幣匯率": "TWFX", "換匯": "TWFX", "商品": "CMDTY", "原物料": "CMDTY",
   "利率": "RATES", "加密": "CRYPTO", "說明": "HELP", "幫助": "HELP", "研究": "LAB", "策略": "LAB", "回測": "LAB", "選股": "LAB", "策略研究": "LAB", "資料庫": "DATA", "目錄": "DATA", "基金": "FUND", "熱門ETF": "TWETF", "ETF排行": "ETF",
   "分析": "TA", "多代理": "TA", "大師": "HF", "量化": "QLIB", "強化學習": "RL", "預測": "FG", "情緒": "FG", "趨勢": "TFM", "趨勢預測": "TFM", "判斷": "LAYA", "買賣": "LAYA", "多空": "LAYA", "LAYA": "LAYA", "問": "ASK", "設定": "SET" };
 const alias = (w) => ZH_CMD[w] || ZH_CMD[(w || "").toUpperCase()] || (w || "").toUpperCase();
@@ -142,7 +142,7 @@ async function boot() {
 }
 
 function savePanes() {
-  try { localStorage.setItem("ft.panes", JSON.stringify(S.panes.map((p) => ({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, cmp: p.cmp })))); } catch (e) {}
+  try { localStorage.setItem("ft.panes", JSON.stringify(S.panes.map((p) => ({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, cmp: p.cmp, fxSel: p.fxSel })))); } catch (e) {}
 }
 
 /* ------------------------------------------------------------ header */
@@ -153,7 +153,7 @@ function clocks() {
 
 function buildFkeys() {
   const keys = [
-    ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["FX", "外匯"],
+    ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
     ["CMDTY", "商品"], ["RATES", "利率"], ["CRYPTO", "加密"], "|", ["GP", "走勢"], ["GIP", "盤中"], ["DES", "概況"], ["N", "新聞"], ["FA", "財報"], "|",
     ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
   ];
@@ -237,6 +237,7 @@ async function run(raw) {
   if (head === "FOCUS") return setPane(target, { fn: "FOCUS" });
   if (head === "EVENTS" || head === "EV") return setPane(target, { fn: "EVENTS" });
   if (head === "LEDGER" || head === "LOG") return setPane(target, { fn: "LEDGER", lgQ: tail.join(" ") });
+  if (head === "TWFX") return setPane(target, { fn: "TWFX", fxSel: tail.join(" ") || S.panes[target].fxSel || "" });
   if (head === "MACRO") return setPane(target, { fn: "MACRO", fredId: (tail[0] || "").toUpperCase() || S.panes[target].fredId || "" });
   if (head === "HOLD") return setPane(target, { fn: "HOLD" });
   if (head === "SC") {
@@ -347,7 +348,7 @@ function renderPane(i) {
     fns.append(h("button", { title: "TradingAgents 多代理人分析", onclick: (e) => { e.stopPropagation(); openSide("tradingagents"); prefillEngine("tradingagents", p.sec); } }, "AI▸"));
   }
   fns.append(h("button", { title: "最大化", onclick: (e) => { e.stopPropagation(); toggleMax(i); } }, "⤢"));
-  const R = { MACRO: renderMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
+  const R = { TWFX: renderTWFX, MACRO: renderMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
               ETFM: renderETFMon, FUNDS: renderFundSearch, FUNDD: renderFund, WORLD: renderWorld, LAYA: renderLaya, LAB: renderLab, DATA: renderData };
   if (R[p.fn]) R[p.fn](i, body, p);
   else if (MON_FNS.includes(p.fn)) renderMon(i, body, p);
@@ -3016,6 +3017,99 @@ async function macroChart(i, box, id, p) {
         s.setMarkers(mk);
       } catch (e) {}
     }
+  });
+}
+
+/* ---------- 台幣匯率：1 外幣 = ? 台幣（漲＝外幣升值／台幣貶值） */
+const fxFmt = (v) => (v == null ? "—" : v >= 100 ? nf(v, 2) : v >= 10 ? nf(v, 3) : v >= 1 ? nf(v, 4) : nf(v, 5));
+const pctCell = (v) => h("td", { class: cls(v) }, v == null ? "—" : (v > 0 ? "+" : "") + nf(v, 2) + "%");
+
+async function renderTWFX(i, body, p) {
+  body.classList.add("mc-body");
+  const chartBox = h("div", { class: "mc-chart hidden" });
+  const holder = h("div", {}, h("div", { class: "loading" }, "讀取匯率"));
+  const conv = h("div", { class: "fx-conv" });
+  body.append(h("div", { class: "ranges" },
+    h("span", { class: "legend", style: "margin-left:0" }, "1 外幣 = 台幣（日圓／韓元等以 100、1000 為單位）。紅＝外幣升值、台幣貶值；點一列看走勢"),
+    h("span", { class: "grow" }),
+    h("button", { onclick: () => { setFocus(i); askSend("根據目前新台幣對美元、日圓、人民幣、歐元等主要貨幣的匯率與近一年走勢，整理台幣強弱、可能原因，以及對台股與出口產業的意涵。"); } }, "問 AI 匯率 ▸")),
+    conv, chartBox, holder);
+  let d;
+  try { d = await api("/api/twfx"); } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  if (S.panes[i].fn !== "TWFX") return;
+  holder.innerHTML = "";
+  const rows = d.rows;
+  const bot = (d.bot && d.bot.rates) || {};
+  // selection by code or Chinese name ("匯率 日圓")
+  const q = (p.fxSel || "").trim();
+  const sel = q && (rows.find((r) => r.code === q.toUpperCase()) || rows.find((r) => r.name === q || r.name.includes(q) || q.includes(r.name)));
+  // quick converter
+  const ok = rows.filter((r) => r.twd);
+  const amt = h("input", { class: "fx-amt", value: "1000", inputmode: "decimal" });
+  const pick = h("select", {}, ...ok.map((r) => h("option", { value: r.code, ...(r.code === (sel ? sel.code : "USD") ? { selected: "" } : {}) }, `${r.flag} ${r.code} ${r.name}`)));
+  const dir = h("select", {}, h("option", { value: "to" }, "外幣 → 台幣"), h("option", { value: "from" }, "台幣 → 外幣"));
+  const out = h("b", { class: "fx-out" });
+  const calc = () => {
+    const r = ok.find((x) => x.code === pick.value); const a = parseFloat(amt.value.replace(/,/g, ""));
+    if (!r || isNaN(a)) { out.textContent = "—"; return; }
+    const b = bot[r.code];
+    const mid = dir.value === "to" ? `${nf(a * r.twd, 2)} 台幣` : `${fxFmt(a / r.twd)} ${r.code}`;
+    const bank = b && (dir.value === "to" ? (b.spot_buy || b.cash_buy) && `台銀買入 ${nf(a * (b.spot_buy || b.cash_buy), 2)} 台幣`
+                                             : (b.cash_sell || b.spot_sell) && `台銀現金賣出 ${fxFmt(a / (b.cash_sell || b.spot_sell))} ${r.code}`);
+    out.textContent = `＝ ${mid}（中價）${bank ? "　" + bank : ""}`;
+  };
+  [amt, pick, dir].forEach((x) => x.addEventListener("input", calc));
+  conv.append(h("span", { class: "muted" }, "換算"), amt, pick, dir, out);
+  calc();
+  const bad = rows.filter((r) => r.error);
+  if (bad.length) holder.append(h("div", { class: "errbox" }, `${bad.length} 個幣別抓不到：${bad.map((r) => r.code).join("、")}（${bad[0].error}）`));
+  for (const g of d.regions) {
+    const rs = rows.filter((r) => r.region === g && r.twd);
+    if (!rs.length) continue;
+    const t = h("table", { class: "grid mc-tbl fx-tbl" });
+    t.innerHTML = `<thead><tr><th>${esc(g)}</th><th>台幣</th><th>1 台幣＝</th><th>日</th><th>1 月</th><th>3 月</th><th>1 年</th><th title="台灣銀行牌告：現金賣出／即期賣出（你買外幣的價格）">台銀賣出</th><th>近 1 年</th></tr></thead>`;
+    const tb = h("tbody");
+    for (const r of rs) {
+      const u = r.unit || 1, b = bot[r.code];
+      tb.append(h("tr", { class: "click" + (sel && sel.code === r.code ? " hl" : ""), title: `52 週 ${fxFmt(r.lo52 * u)}–${fxFmt(r.hi52 * u)}（${r.date}）`,
+        onclick: () => setPane(i, { fxSel: sel && sel.code === r.code ? "" : r.code }) },
+        h("td", { class: "nm" }, `${r.flag} ${r.name}`, h("small", { class: "muted" }, ` ${r.code}${u > 1 ? "×" + u : ""}`)),
+        h("td", {}, h("b", {}, fxFmt(r.twd * u))), h("td", { class: "muted" }, fxFmt(r.per_twd)),
+        pctCell(r.d1), pctCell(r.m1), pctCell(r.m3), pctCell(r.y1),
+        h("td", { class: "muted" }, b ? `${b.cash_sell ? fxFmt(b.cash_sell * u) : "—"}／${b.spot_sell ? fxFmt(b.spot_sell * u) : "—"}` : ""),
+        h("td", { html: sparkSvg(r.spark) })));
+    }
+    t.append(tb);
+    holder.append(t);
+  }
+  holder.append(h("div", { class: "muted fx-src" }, `資料：Yahoo Finance 交叉匯率（中價，台幣＝USD/TWD ÷ USD/外幣）；${esc((d.bot && d.bot.source) || "台灣銀行牌告")}${d.bot && d.bot.error ? "（目前抓不到：" + esc(d.bot.error) + "）" : ""}。實際換匯以銀行為準。`));
+  if (sel) fxChart(i, chartBox, sel.code, p);
+}
+
+async function fxChart(i, box, code, p) {
+  box.classList.remove("hidden");
+  const rng = p.fxRange || "1y";
+  const bar = h("div", { class: "ranges" });
+  const area = h("div", { class: "mc-area" });
+  box.append(bar, area);
+  let d;
+  try { d = await api(`/api/twfx/series?ccy=${code}&range=${rng}`); } catch (e) { area.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  const u = d.unit || 1;
+  const first = d.points.length ? d.points[0].value : null, last = d.points.length ? d.points[d.points.length - 1].value : null;
+  const chg = first && last ? (last / first - 1) * 100 : null;
+  bar.append(h("b", { style: "color:var(--amber)" }, `${d.flag} ${u > 1 ? u + " " : ""}${d.name}（${code}）＝ ${fxFmt(last * u)} 台幣`),
+    h("span", { class: cls(chg) }, chg == null ? "" : `　區間 ${chg > 0 ? "+" : ""}${nf(chg, 2)}%`),
+    h("span", { class: "grow" }), ...[["1mo", "1 月"], ["3mo", "3 月"], ["6mo", "6 月"], ["1y", "1 年"], ["2y", "2 年"], ["5y", "5 年"], ["10y", "10 年"]].map(([k, l]) =>
+      h("button", { class: rng === k ? "on" : "", onclick: () => setPane(i, { fxRange: k }) }, l)));
+  if (!d.points.length) { area.innerHTML = `<div class="empty">沒有資料</div>`; return; }
+  requestAnimationFrame(() => {
+    const chart = LightweightCharts.createChart(area, { ...chartTheme(), autoSize: true });
+    const prec = last * u >= 100 ? 2 : last * u >= 10 ? 3 : last * u >= 1 ? 4 : 5;
+    const s = chart.addAreaSeries({ lineColor: cssVar("--amber"), topColor: "rgba(255,160,40,.25)", bottomColor: "rgba(255,160,40,0)", lineWidth: 2,
+      priceFormat: { type: "price", precision: prec, minMove: 1 / 10 ** prec } });
+    s.setData(d.points.map((x) => ({ time: x.time, value: x.value * u })));
+    chart.timeScale().fitContent();
+    S.charts.set(i, { chart, fit: () => chart.timeScale().fitContent() });
   });
 }
 

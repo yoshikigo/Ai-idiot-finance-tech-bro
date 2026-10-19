@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from ft_common import context, edgar, events, focus, fred, funds, ledger, market, notes, ollama, supplychain, twmarket, world
+from ft_common import context, edgar, events, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmarket, world
 
 DATA = Path(os.environ.get("FT_DATA", "/data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -457,6 +457,11 @@ async def api_ask(req: Request):
                 parts.append(await run_in_threadpool(edgar.filings_text, t, 8))
             except Exception:  # noqa: BLE001
                 pass
+    if any(k in last_q for k in ("匯率", "台幣", "新台幣", "美元", "日圓", "日幣", "人民幣", "歐元", "韓元", "換匯", "升值", "貶值")):
+        try:
+            parts.append(await run_in_threadpool(fx.text, None))
+        except Exception:  # noqa: BLE001
+            pass
     if any(k in last_q for k in ("大跌", "大漲", "暴跌", "崩盤", "重挫", "大事", "重大事件", "為什麼", "Fed", "聯準會", "降息", "升息")):
         try:  # the year's market-moving days (detected + FOMC + your own), so "四月為什麼大跌" has something to stand on
             import datetime as _dt
@@ -739,6 +744,25 @@ def api_sec_filings(s: str, forms: str = "", limit: int = 20):
         return {"enabled": False, "message": str(e), "filings": []}
     except Exception as e:  # noqa: BLE001
         _err(e)
+
+
+@app.get("/api/twfx")
+def api_twfx():
+    """新台幣對主要貨幣：最新、日／月／季／年變動、52 週高低、sparkline，加台灣銀行牌告。"""
+    return {"rows": fx.snapshot(), "regions": fx.REGIONS, "bot": fx.bot_rates()}
+
+
+@app.get("/api/twfx/series")
+def api_twfx_series(ccy: str, range: str = "1y"):  # noqa: A002
+    period = range if range in ("1mo", "3mo", "6mo", "1y", "2y", "5y", "10y") else "1y"
+    try:
+        pts = fx.history(ccy, period)
+    except KeyError:
+        raise HTTPException(404, "不支援的幣別")
+    except Exception as e:  # noqa: BLE001
+        _err(e)
+    name, region, flag = fx.CCY[ccy.upper()]
+    return {"code": ccy.upper(), "name": name, "flag": flag, "unit": fx.UNIT.get(ccy.upper(), 1), "points": pts}
 
 
 @app.get("/api/macro")

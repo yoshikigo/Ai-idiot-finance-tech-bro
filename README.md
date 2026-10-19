@@ -14,6 +14,14 @@
 - **Qlib** 多一個股票池「台股熱門 ETF 輪動（含債券 ETF）」；選股排名附中文名稱。**FinGPT** 對台股改用中文新聞。
 - **Hermes skill `fin-terminal`** 與 **Open WebUI Tool**，共用新的 `/api/agent/*`。
 
+## 💱 台幣匯率（2026.10.19-26 新增）
+
+功能鍵 **台幣**（或指令 `匯率`、`台幣`、`匯率 日圓`、`TWFX JPY`）：新台幣對 32 種貨幣，依「主要／亞洲／歐洲／美洲大洋洲／中東非洲」分組。
+- 每列：1 外幣＝台幣（日圓、匈牙利福林以 100，韓元以 1000，印尼盾、越南盾以 10000 為單位）、1 台幣＝外幣、日／1 月／3 月／1 年變動、台銀牌告（現金賣出／即期賣出）、近 1 年 sparkline；滑過看 52 週高低。**紅＝外幣升值、台幣貶值**。
+- 點一列：上方畫該貨幣對台幣走勢（1 月～10 年）；頂端有換算器（外幣↔台幣，中價＋台銀牌告價）。
+- 資料：Yahoo 交叉匯率（台幣／外幣 ＝ USD/TWD ÷ USD/外幣，完整日線歷史）＋台灣銀行牌告 CSV（10 分鐘快取）。實際換匯以銀行為準。
+- ASK 問到匯率、台幣、日圓、升貶值會自動帶入；Hermes `ft.py twfx [USD,JPY]`、Open WebUI `twd_exchange_rates`、agent `/api/agent/twfx?q=USD,JPY`。
+
 ## 🌍 公開網址：https://fin.example.com（Cloudflare Tunnel，2026.10.19-23 新增）
 
 ```bash
@@ -351,6 +359,7 @@ tar xzf fin-terminal.tar.gz && cd fin-terminal
 - ✅ 台股資料層 9 個離線測試：ISIN 清單（保留股票、ETF，略過權證；Big5 解碼）、MIS（上市／上櫃／指數、無成交試算價、空殼列）、`all_etf.txt`（數字／字串混合、「未結出」）、ETF 分類與排序、投信投顧公會月份選單與表格（合計列、改版偵測）、**成分股 postback 流程**（VIEWSTATE 串接、依類別查、去掉警語與級別比對基金名）、三種基金 CSV（BOM、千分位、民國年、壞資料）、SQLite 累積與報酬計算、Google 新聞 RSS。SITCA fixture 格式沿用 TWSEMCPServer 的測試（那個專案有對真實網站的 e2e 測試）。
 - ✅ 用假資料＋假 Ollama 跑過：UI（Chromium 截圖：中文指令、ETF 總覽、ETF 資料頁、基金搜尋→走勢、紅漲綠跌、手機版）、agent API 全部端點、Hermes `ft.py` 全部指令（含 analyze → DONE／PENDING、引擎離線訊息、參數型別轉換）、Open WebUI Tool 10 個方法（含進度事件）、ASK 自動帶入問題中的標的。
 - ✅ TimesFM：用 timesfm 3.0.2 的真實程式碼（2.5 與 3.0 兩條路徑）以隨機權重在 CPU 跑過預測、回測、基金淨值、同步 API、側欄報告、走勢圖與基金圖的疊圖、Hermes `forecast`、agent API；lock 檔在乾淨環境可安裝。⚠️ 我這邊連不到 Hugging Face，**真實權重的下載與預測品質要在你那邊看**（smoke.sh 會跑一次 0050）。
+- ✅ 2026.10.19-26：台幣匯率 3 個測試（台銀牌告 CSV 解析含 0＝不提供、交叉匯率與日變動計算、API／走勢／不支援幣別 404／agent 指定幣別）；Chromium 截圖檢查分組表、換算器與走勢圖。⚠️ 真實 Yahoo 交叉匯率與台銀 CSV 要 smoke 確認。
 - ✅ 2026.10.19-25：公開版整理——預設值改成通用（Ollama 11434、模型 qwen3:32b、資料 ~/fin-terminal-data、vault ~/Obsidian/vault、公開網址需 `FT_PUBLIC_HOST`），已安裝的機器沿用原本的資料位置與設定檔。
 - ✅ 2026.10.19-24：TOTP 2 個測試（RFC 6238 官方向量；設定→錯碼不啟用→啟用→公開網址要驗證碼→同一碼不能重用→下一碼可登入→救援碼只能用一次→公開網址不能關→本機用密碼＋救援碼關閉→資料庫無明文救援碼；公開網址沒 TOTP 的帳號被拒）；Chromium 截圖檢查 QR 設定與公開登入訊息。
 - ✅ 2026.10.19-23：公開網址閘門 3 個測試（本機不變；公開網址未登入 401、agent API／docs 404、不能註冊、只帶 CF-Connecting-IP 也算公開；登入後可用但不能改設定、X-Frame-Options DENY）；Chromium 截圖檢查登入閘門（錯密碼訊息、登入後進終端）。⚠️ Cloudflare Tunnel 本身要你那邊建立 token 後確認。

@@ -667,3 +667,17 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .totp-qr svg { display: block; width: 180px; height: 180px; image-rendering: pixelated; }
 .totp-secret { user-select: all; letter-spacing: .05em; color: var(--amber); }
 .totp-codes { background: #0b0b0b; border: 1px solid var(--line-2); padding: 8px 12px; color: var(--amber); user-select: all; margin: 4px 0; }
+
+/* 台幣匯率 */
+.fx-conv { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.fx-conv input, .fx-conv select { background: #0b0b0b; border: 1px solid var(--line-2); color: var(--text); padding: 3px 6px; }
+.fx-amt { width: 110px; text-align: right; }
+.fx-out { color: var(--amber); font-weight: 600; }
+.fx-tbl { table-layout: fixed; width: 100%; }
+.fx-tbl th:nth-child(1) { width: 22%; } .fx-tbl th:nth-child(2) { width: 10%; } .fx-tbl th:nth-child(3) { width: 10%; }
+.fx-tbl th:nth-child(4), .fx-tbl th:nth-child(5), .fx-tbl th:nth-child(6), .fx-tbl th:nth-child(7) { width: 8%; }
+.fx-tbl th:nth-child(8) { width: 14%; } .fx-tbl th:nth-child(9) { width: 12%; }
+.fx-tbl td, .fx-tbl th { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fx-tbl td:nth-child(n+2), .fx-tbl th:nth-child(n+2) { text-align: right; }
+.fx-tbl td:last-child svg { width: 100%; }
+.fx-src { padding: 8px; font-size: 11px; }

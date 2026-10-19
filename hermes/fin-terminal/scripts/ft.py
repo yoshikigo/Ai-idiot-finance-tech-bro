@@ -10,6 +10,7 @@
   ft.py market | news 台積電 | watchlist | brief
   ft.py focus                               今日焦點（供應鏈題材漲跌、強弱勢股、三大法人、新聞、AI 今日重點）
   ft.py macro                               美國總經（FRED：利率、通膨、就業、景氣）
+  ft.py twfx [USD,JPY…]                     新台幣匯率（1 外幣＝台幣，日／月／年變動）
   ft.py sec NVDA                            美股 SEC 最近申報與年度財報
   ft.py ledger                              AI 分析紀錄：各 agent 事後核對命中率、最近檢討
   ft.py events [--days 365]                 近一年市場重大事件（指數大波動、Fed 決策）＋AI 摘要
@@ -90,6 +91,8 @@ def main():
         out = call("focus", timeout=180)
     elif c == "macro":
         out = call("macro", timeout=120)
+    elif c in ("twfx", "fx-twd"):
+        out = call("twfx", {"q": words.replace(" ", ",")}, timeout=120)
     elif c == "sec":
         out = call("sec", {"q": words}, timeout=120)
     elif c in ("ledger", "track"):
