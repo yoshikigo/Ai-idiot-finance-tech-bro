@@ -93,7 +93,7 @@ FT_PUBLIC_HOST=fin.example.com ./install.sh terminal --cloudflare
 ## 2026.10.19-15：英文新聞、近年大事、供應鏈美國對照
 
 - **英文新聞**：Yahoo 對指數、匯率、期貨幾乎沒有新聞（^GSPC 會是空的）。現在依序找：Yahoo（該代號）→ 對應 ETF（^GSPC→SPY、^IXIC→QQQ、^SOX→SOXX、^TWII→EWT、黃金→GLD、原油→USO…）→ Google News 英文版。
-- **載入近年大事**：「大事」頁按「⤓ 載入近年大事」→ 用近 10 年指數歷史偵測大漲大跌，並載入內建的 2020 年起歷史大事 24 件（疫情股災與熔斷、Fed 無上限 QE、原油負價、輝瑞疫苗、GameStop、俄烏戰爭、Fed 升息 3 碼、ChatGPT、SVB、輝達財報、日圓套利平倉股災、Fed 降息、美國大選、DeepSeek、對等關稅與台股 4/7 暴跌、關稅暫緩、美中日內瓦協議）。歷史大事會自動算出當天各指數漲跌、抓當時新聞；附近偵測到的大波動會併進去，不重複標。篩選多了「歷史大事」、5 年、10 年。內建清單在 `common/ft_common/events.py` 的 `HISTORY`，2025 年 5 月之後的事件交給自動偵測＋新聞＋AI 命名。背景偵測年數：`FT_EVENTS_YEARS`（預設 2）。
+- **載入近年大事**：「大事」頁按「⤓ 載入近年大事」→ 用近 10 年指數歷史偵測大漲大跌，並載入內建的 2020 年起歷史大事 38 件（疫情股災與熔斷、Fed 無上限 QE、原油負價、輝瑞疫苗、GameStop、Omicron、俄烏戰爭、Fed 升息 3 碼、裴洛西訪台、美國晶片出口管制、ChatGPT、SVB、輝達財報、惠譽降評美國、日銀結束負利率、川普保護費說、日圓套利平倉股災、Fed 降息、美國大選、Fed 鷹派降息、DeepSeek、對等關稅與台股 4/7 暴跌、關稅暫緩、新台幣兩日狂升、美中日內瓦協議、對台關稅 20%、川普威脅 100% 關稅、川習釜山會、2026/6 AI 股重挫、717 股災、中國晶片自主衝擊）。歷史大事會自動算出當天各指數漲跌、抓當時新聞；附近偵測到的大波動會併進去，不重複標。篩選多了「歷史大事」、5 年、10 年。內建清單在 `common/ft_common/events.py` 的 `HISTORY`（日期與數字依當時新聞查證），其餘交給自動偵測＋新聞＋AI 命名；已安裝的會在下次背景偵測或按「⤓ 載入近年大事」時補進新的。背景偵測年數：`FT_EVENTS_YEARS`（預設 2）。
 - **供應鏈美國對照**：供應鏈地圖上方「🇺🇸 美國對照」→ 每個環節同時顯示「台股平均」與「美國同類平均」；點環節多一張「美國同類（對照）」表（例：散熱 ↔ Vertiv、Modine；先進封裝 ↔ Amkor、Intel；測試 ↔ Teradyne、FormFactor；光通訊 ↔ Lumentum、Fabrinet；矽智財 ↔ Arm、Synopsys、Cadence；記憶體 ↔ 美光、SanDisk）。環節排行表多了「美國同類」「台−美」欄。沒有美國同類的環節（ABF、BBU、機殼滑軌）就不比。名單在 `supplychain.py` 的 `US_PEERS`。
 
 ## 📌 重大事件：指數走勢圖上的標記＋「大事」分頁（2026.10.19-14 新增）
@@ -361,6 +361,7 @@ tar xzf fin-terminal.tar.gz && cd fin-terminal
 - ✅ 台股資料層 9 個離線測試：ISIN 清單（保留股票、ETF，略過權證；Big5 解碼）、MIS（上市／上櫃／指數、無成交試算價、空殼列）、`all_etf.txt`（數字／字串混合、「未結出」）、ETF 分類與排序、投信投顧公會月份選單與表格（合計列、改版偵測）、**成分股 postback 流程**（VIEWSTATE 串接、依類別查、去掉警語與級別比對基金名）、三種基金 CSV（BOM、千分位、民國年、壞資料）、SQLite 累積與報酬計算、Google 新聞 RSS。SITCA fixture 格式沿用 TWSEMCPServer 的測試（那個專案有對真實網站的 e2e 測試）。
 - ✅ 用假資料＋假 Ollama 跑過：UI（Chromium 截圖：中文指令、ETF 總覽、ETF 資料頁、基金搜尋→走勢、紅漲綠跌、手機版）、agent API 全部端點、Hermes `ft.py` 全部指令（含 analyze → DONE／PENDING、引擎離線訊息、參數型別轉換）、Open WebUI Tool 10 個方法（含進度事件）、ASK 自動帶入問題中的標的。
 - ✅ TimesFM：用 timesfm 3.0.2 的真實程式碼（2.5 與 3.0 兩條路徑）以隨機權重在 CPU 跑過預測、回測、基金淨值、同步 API、側欄報告、走勢圖與基金圖的疊圖、Hermes `forecast`、agent API；lock 檔在乾淨環境可安裝。⚠️ 我這邊連不到 Hugging Face，**真實權重的下載與預測品質要在你那邊看**（smoke.sh 會跑一次 0050）。
+- ✅ 2026.10.19-28：歷史大事 24 → 38 件（補 2021–2026，2025/5 之後的事件日期與數字已對照新聞查證）。
 - ✅ 2026.10.19-27：台幣事件與預測 2 個測試（異常波動偵測與 3 日合併、央行理監事會事件、匯率圖不放指數大波動、TimesFM 接受 TWFX:代碼 序列）；Chromium 截圖檢查美元兩年圖的事件標記與 3 個月預測帶。⚠️ 真實 TimesFM 對匯率的預測要你那邊看。
 - ✅ 2026.10.19-26：台幣匯率 3 個測試（台銀牌告 CSV 解析含 0＝不提供、交叉匯率與日變動計算、API／走勢／不支援幣別 404／agent 指定幣別）；Chromium 截圖檢查分組表、換算器與走勢圖。⚠️ 真實 Yahoo 交叉匯率與台銀 CSV 要 smoke 確認。
 - ✅ 2026.10.19-25：公開版整理——預設值改成通用（Ollama 11434、模型 qwen3:32b、資料 ~/fin-terminal-data、vault ~/Obsidian/vault、公開網址需 `FT_PUBLIC_HOST`），已安裝的機器沿用原本的資料位置與設定檔。
