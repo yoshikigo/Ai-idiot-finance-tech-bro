@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from ft_common import context, edgar, events, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmarket, world
+from ft_common import context, dca, edgar, events, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmarket, world
 
 DATA = Path(os.environ.get("FT_DATA", "/data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -785,6 +785,61 @@ def api_twfx_events(ccy: str, range: str = "1y"):  # noqa: A002
             "summary": f"單日 {name}兌台幣 {m['pct']:+.2f}%，約 {m['sigma']} 倍近 60 日波動"} for m in mv if m["date"] >= since]
     out += events.markers(since, None, f"TWFX:{code}")
     return sorted(out, key=lambda e: e["date"])
+
+
+# ------------------------------------------------------------------ 定期定額回測
+def _dca_run(b: dict) -> list[dict]:
+    syms = [x.strip() for x in str(b.get("symbols") or "").replace("，", ",").replace("、", ",").split(",") if x.strip()][:6]
+    if not syms:
+        raise HTTPException(400, "請輸入至少一個標的（最多 6 個）")
+    out = []
+    for raw in syms:
+        sym = raw if raw.upper().startswith("FUND:") else (context.resolve(raw) or raw.upper())
+        try:
+            r = dca.simulate(sym, b.get("amount") or 3000, b.get("freq") or "monthly", b.get("days") or "6",
+                             b.get("start") or None, b.get("end") or None, b.get("fee_pct", 0.1425), b.get("min_fee", 1),
+                             lots_out=0 if b.get("all_lots") else 24)
+            r["name"] = _dca_name(sym)
+            out.append(r)
+        except (ValueError, KeyError) as e:
+            out.append({"symbol": sym, "error": str(e)})
+        except Exception as e:  # noqa: BLE001
+            out.append({"symbol": sym, "error": f"{type(e).__name__}: {str(e)[:160]}"})
+    return out
+
+
+def _dca_name(sym: str) -> str:
+    try:
+        if sym.startswith("FUND:"):
+            return (funds.get(sym[5:]) or {}).get("name") or ""
+        return twmarket.zh_name(sym) or NAMES.get(sym, "")
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+@app.post("/api/dca/backtest")
+async def api_dca_backtest(req: Request):
+    b = await req.json()
+    res = await run_in_threadpool(_dca_run, b)
+    return {"results": res, "text": dca.text(res)}
+
+
+@app.post("/api/dca/ai")
+async def api_dca_ai(req: Request):
+    """Ollama 評估定期定額回測結果（只用回測數字，不碰你的持股）。"""
+    b = await req.json()
+    txt = str(b.get("text") or "")[:6000]
+    if not txt:
+        raise HTTPException(400, "先跑回測")
+    s = load_settings()
+    system = ("你是審慎的理財顧問。根據使用者提供的「定期定額回測數字」評估：哪個標的表現較好、報酬來自哪裡（長期趨勢或期末反彈）、"
+              "定期定額相對單筆投入的優劣、最大回撤代表的持有難度、扣款頻率與手續費的影響，以及適合怎樣的投資人。"
+              "只能引用提供的數字，不要編造；過去績效不代表未來；最後一句提醒這不是投資建議。用繁體中文，條列為主，600 字內。")
+    try:
+        out = await run_in_threadpool(ollama.ask, llm_block(s), system, txt, language=s.get("language"))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(502, f"Ollama：{e}") from e
+    return {"text": out}
 
 
 @app.get("/api/macro")

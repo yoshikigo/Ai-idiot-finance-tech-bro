@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from ft_common import context, edgar, events, focus, fred, funds, fx, ledger, notes, supplychain, twmarket, world
+from ft_common import context, dca, edgar, events, focus, fred, funds, fx, ledger, notes, supplychain, twmarket, world
 
 router = APIRouter(prefix="/api/agent")
 _hooks: dict = {}  # set by app.py: settings loader, llm block, engines map
@@ -228,6 +228,23 @@ def twfx_text(q: str = "", plain: bool = False, format: str = "text"):  # noqa: 
     """新台幣匯率：1 外幣 = 多少台幣，日／月／年變動。q 可指定幣別（例：USD,JPY,EUR）。"""
     codes = [c.strip().upper() for c in q.replace("，", ",").split(",") if c.strip().upper() in fx.CCY] or None
     return _out(fx.text(codes), plain, None, format)
+
+
+@router.get("/dca")
+def dca_text(q: str, amount: float = 3000, freq: str = "monthly", days: str = "6", years: float = 5, start: str = "",
+             fee: float = 0.1425, plain: bool = False, format: str = "text"):  # noqa: A002
+    """定期定額回測：q＝標的（逗號分隔，最多 6 個，可用中文名或 FUND:代號），每期 amount 台幣、freq monthly/weekly/daily、
+    days 扣款日（每月 6,16,26／每週 1–5）、回測 years 年（或 start=YYYY-MM-DD）、fee 手續費 %。對比同金額單筆投入。"""
+    import datetime as _dt
+    st = start or (_dt.date.today() - _dt.timedelta(days=int(365.25 * max(0.1, min(years, 30))))).isoformat()
+    out = []
+    for raw in [x.strip() for x in q.replace("，", ",").replace("、", ",").split(",") if x.strip()][:6]:
+        sym = raw if raw.upper().startswith("FUND:") else (context.resolve(raw) or raw.upper())
+        try:
+            out.append(dca.simulate(sym, amount, freq, days, st, None, fee, 1, lots_out=0))
+        except Exception as e:  # noqa: BLE001
+            out.append({"symbol": sym, "error": str(e)[:160]})
+    return _out(dca.text(out), plain, None, format)
 
 
 @router.get("/sec")

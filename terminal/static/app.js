@@ -63,12 +63,12 @@ const ETF_FNS = ["GP", "GIP", "ETF", "N", "LAYA"];
 const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: "財報", ETF: "ETF 資料", LAYA: "⚖ 判斷" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
 const MON_TITLE = { TWFX: "台幣匯率", MACRO: "美國總經（FRED）", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
-const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings" };
+const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
 const ZH_CMD = { "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
   "持股": "HOLD", "我的持股": "HOLD", "庫存": "HOLD", "登入": "HOLD", "走勢": "GP", "K線": "GP", "線圖": "GP", "盤中": "GIP", "概況": "DES", "資料": "DES", "新聞": "N", "財報": "FA",
   "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "TWFX", "台幣": "TWFX", "台幣匯率": "TWFX", "換匯": "TWFX", "商品": "CMDTY", "原物料": "CMDTY",
   "利率": "RATES", "加密": "CRYPTO", "說明": "HELP", "幫助": "HELP", "研究": "LAB", "策略": "LAB", "回測": "LAB", "選股": "LAB", "策略研究": "LAB", "資料庫": "DATA", "目錄": "DATA", "基金": "FUND", "熱門ETF": "TWETF", "ETF排行": "ETF",
-  "分析": "TA", "多代理": "TA", "大師": "HF", "量化": "QLIB", "強化學習": "RL", "預測": "FG", "情緒": "FG", "趨勢": "TFM", "趨勢預測": "TFM", "判斷": "LAYA", "買賣": "LAYA", "多空": "LAYA", "LAYA": "LAYA", "問": "ASK", "設定": "SET" };
+  "分析": "TA", "多代理": "TA", "大師": "HF", "量化": "QLIB", "強化學習": "RL", "預測": "FG", "情緒": "FG", "趨勢": "TFM", "趨勢預測": "TFM", "判斷": "LAYA", "買賣": "LAYA", "多空": "LAYA", "LAYA": "LAYA", "問": "ASK", "設定": "SET", "定期定額": "DCA", "定額": "DCA" };
 const alias = (w) => ZH_CMD[w] || ZH_CMD[(w || "").toUpperCase()] || (w || "").toUpperCase();
 
 async function resolveSec(text) {
@@ -260,6 +260,7 @@ async function run(raw) {
     const tab = AI_CMDS[head];
     openSide(tab);
     if (tab === "ask") { if (tail.length) askSend(tail.join(" ")); else setTimeout(() => $("#askIn") && $("#askIn").focus(), 50); return; }
+    if (tab === "dca") { if (tail.length) dcaPrefill({ symbols: tail.join(" ").replace(/[,，、\s]+/g, ", ").replace(/^, |, $/g, "") }, true); return; }
     if (tail.length) prefillEngine(tab, tail.join(" "));
     return;
   }
@@ -1616,6 +1617,7 @@ function renderTabs() {
     tabs.append(h("button", { class: S.sideTab === e.name ? "on" : "", onclick: () => openSide(e.name) },
       h("span", { class: "dot " + (busy(e.name) ? "busy" : e.online ? "on" : "off") }), SHORT[e.name] || e.name));
   }
+  tabs.append(h("button", { class: S.sideTab === "dca" ? "on" : "", onclick: () => openSide("dca") }, "📈 定期定額"));
   tabs.append(h("button", { class: S.sideTab === "ask" ? "on" : "", onclick: () => openSide("ask") }, "💬 ASK"));
   tabs.append(h("button", { class: S.sideTab === "settings" ? "on" : "", onclick: () => openSide("settings") }, "⚙ 設定"));
   tabs.append(h("button", { class: "side-close", title: "關閉側欄", onclick: () => toggleSide(false) }, "✕"));
@@ -1628,6 +1630,7 @@ function renderSide() {
   body.innerHTML = "";
   if (S.sideTab === "ask") return renderAsk(body);
   if (S.sideTab === "settings") return renderSettings(body);
+  if (S.sideTab === "dca") return renderDCA(body);
   const eng = S.engines.find((e) => e.name === S.sideTab) || S.engines[0];
   if (!eng) { body.innerHTML = `<div class="empty">沒有引擎</div>`; return; }
   S.sideTab = eng.name;
@@ -2479,20 +2482,22 @@ async function refreshHold(i, first) {
   if (p.fn !== "HOLD") return;
   const ae = document.activeElement;
   if (!first && (p.editing || (ae && body.contains(ae) && /INPUT|SELECT|TEXTAREA/.test(ae.tagName)))) return;  // don't wipe what you're typing
-  let d;
-  try { d = await api("/api/me/holdings"); }
+  let d, dd;
+  try { [d, dd] = await Promise.all([api("/api/me/holdings"), api("/api/me/dca").catch((e) => ({ error: e.message, plans: [] }))]); }
   catch (e) {
     if (/登入/.test(e.message)) { S.user = null; afterAuthChange(); return; }
     body.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return;
   }
   if (S.panes[i].fn !== "HOLD") return;
+  const ae2 = document.activeElement;
+  if (!first && (S.panes[i].editing || S.panes[i].dcaEditing || (ae2 && body.contains(ae2) && /INPUT|SELECT|TEXTAREA/.test(ae2.tagName)))) return;
   const scroll = body.scrollTop;
   body.innerHTML = "";
-  holdView(i, body, d);
+  holdView(i, body, d, dd);
   body.scrollTop = scroll;
 }
 
-function holdView(i, body, d) {
+function holdView(i, body, d, dd) {
   const p = S.panes[i];
   const t = d.total;
   $(".pane-name", paneEl(i)).textContent = `👤 ${d.user} · 只有你看得到`;
@@ -2514,6 +2519,7 @@ function holdView(i, body, d) {
   body.append(holdForm(i, d));
   if (!d.rows.length) {
     body.append(h("div", { class: "empty" }, "還沒有持股：在上面輸入代號或名稱、股數、每股成本後按「新增」。"));
+    body.append(dcaSection(i, dd));
     return;
   }
   const tbl = h("table", { class: "grid hold-tbl" });
@@ -2552,6 +2558,185 @@ function holdView(i, body, d) {
     const covered = d.exposure.reduce((a, x) => a + x.weight, 0);
     body.append(h("section", { class: "fx-sec" }, h("h4", {}, `供應鏈曝險（佔總市值；地圖外 ${nf(Math.max(0, 100 - covered), 1)}%）`), ex));
   }
+  body.append(dcaSection(i, dd));
+}
+
+/* ---------- 側欄：定期定額回測＋AI 評估 */
+const DCA_DEF = () => ({ symbols: S.panes[S.focus] && S.panes[S.focus].sec ? S.panes[S.focus].sec : "0050, VOO, BTC-USD", amount: 5000, freq: "monthly", days: "6",
+  start: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return d.toLocaleDateString("sv-SE"); })(), end: "", fee_pct: 0.1425 });
+
+function dcaPrefill(v, run) {
+  S.dcaForm = { ...(S.dcaForm || DCA_DEF()), ...v };
+  S.dcaResult = null;
+  if (S.sideTab === "dca") renderSide();
+  if (run !== false) setTimeout(() => { const f = $("#dcaForm"); if (f) f.requestSubmit(); }, 50);
+}
+
+function renderDCA(body) {
+  const v = S.dcaForm || (S.dcaForm = DCA_DEF());
+  body.append(h("div", { class: "eng-head" },
+    h("h2", {}, h("span", { class: "dot on" }), "定期定額回測＋AI 評估"),
+    h("p", {}, "過去每期固定金額買進台股、美股、ETF、基金或比特幣，現在值多少？和同一筆錢第一天全部買進（單筆）比較，算年化報酬（XIRR）與最大回撤，再請本機 Ollama 評估。"),
+    h("div", { class: "model", html: engineModel("ask") })));
+  const inp = (name, attrs) => h("input", { name, value: v[name] ?? "", ...attrs });
+  const freq = h("select", { name: "freq" }, ...Object.entries({ monthly: "每月", weekly: "每週", daily: "每個交易日" }).map(([k, l]) => h("option", { value: k, ...(v.freq === k ? { selected: "" } : {}) }, l)));
+  const days = inp("days", { placeholder: "6,16,26" });
+  const syncDays = () => { days.disabled = freq.value === "daily"; days.placeholder = freq.value === "weekly" ? "星期 1–5" : "6,16,26"; };
+  freq.addEventListener("change", () => { days.value = freq.value === "weekly" ? "1" : freq.value === "monthly" ? "6" : ""; syncDays(); });
+  syncDays();
+  const row = (label, el, wide) => h("div", { class: "f" + (wide ? " wide" : "") }, h("label", {}, label), el);
+  const go = h("button", { class: "btn run", type: "submit" }, "▶ 回測");
+  const form = h("form", { class: "form", id: "dcaForm" },
+    row("標的（逗號分隔，最多 6 個；可用中文名、FUND:代號）", inp("symbols", { placeholder: "0050, 台積電, VOO, BTC-USD, 安聯台灣科技", spellcheck: "false", class: "tick" }), true),
+    row("每期金額（台幣）", inp("amount", { type: "number", min: "1", step: "1" })), row("頻率", freq),
+    row("扣款日（每月幾號／每週星期幾）", days), row("手續費 %（最低 1 元）", inp("fee_pct", { type: "number", min: "0", step: "0.0001" })),
+    row("開始", inp("start", { type: "date" })), row("結束（空白＝今天）", inp("end", { type: "date" })),
+    h("div", { class: "f wide dca-quick" }, ...[[1, "近 1 年"], [3, "3 年"], [5, "5 年"], [10, "10 年"], [20, "20 年"]].map(([y, l]) =>
+      h("button", { type: "button", class: "chip", onclick: () => { const d = new Date(); d.setFullYear(d.getFullYear() - y); form.start.value = d.toLocaleDateString("sv-SE"); form.end.value = ""; } }, l))),
+    h("div", { class: "run-row f wide" }, go, h("span", { class: "hint" }, "用歷史收盤價計算，幾秒內完成；AI 評估另外按")));
+  const out = h("div", { class: "dca-out" });
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const b = Object.fromEntries(new FormData(form).entries());
+    b.freq = freq.value;
+    S.dcaForm = b;
+    go.disabled = true; out.innerHTML = `<div class="loading">回測中</div>`;
+    try { S.dcaResult = await api("/api/dca/backtest", { method: "POST", json: b }); dcaResults(out, S.dcaResult); }
+    catch (err) { out.innerHTML = `<div class="errbox">${esc(err.message)}</div>`; }
+    go.disabled = false;
+  });
+  body.append(form, out);
+  if (S.dcaResult) dcaResults(out, S.dcaResult);
+}
+
+const DCA_COLORS = ["#ffa028", "#4ba3ff", "#3ad6d6", "#b48cff", "#ff6b9a", "#9be564"];
+
+function dcaResults(out, d) {
+  out.innerHTML = "";
+  const ok = d.results.filter((r) => !r.error);
+  for (const r of d.results.filter((x) => x.error)) out.append(h("div", { class: "errbox" }, `${r.symbol}：${r.error}`));
+  if (!ok.length) return;
+  const tbl = h("table", { class: "grid dca-res" });
+  tbl.innerHTML = `<thead><tr><th>標的</th><th>期數</th><th>投入</th><th>市值</th><th>報酬</th><th title="XIRR：考慮每筆投入時間">年化</th><th title="持有期間「市值／累積投入」從高點的最大跌幅">最大回撤</th><th title="同一筆總金額在第一期全部買進">單筆報酬</th><th>單筆年化</th></tr></thead>`;
+  const tb = h("tbody");
+  ok.forEach((r, k) => tb.append(h("tr", { title: `${r.plan}，${r.start}～${r.end}；手續費合計 ${nf(r.fees, 0)} 元；${r.price_note}` },
+    h("td", { class: "nm" }, h("i", { class: "dca-dot", style: `background:${DCA_COLORS[k % 6]}` }), h("b", {}, r.symbol.replace(/\.TWO?$/, "")), " ", r.name || ""),
+    h("td", {}, r.n), h("td", {}, nf(r.invested, 0)), h("td", {}, nf(r.value, 0)),
+    h("td", { class: cls(r.ret) }, pct(r.ret)), h("td", { class: cls(r.xirr) }, pct(r.xirr)), h("td", { class: "down" }, pct(r.mdd)),
+    h("td", { class: cls(r.lump.ret) }, pct(r.lump.ret)), h("td", { class: cls(r.lump.xirr) }, pct(r.lump.xirr)))));
+  tbl.append(tb);
+  const chart = h("div", { class: "dca-chart" });
+  const ai = h("div", { class: "dca-ai" });
+  const aiBtn = h("button", { class: "btn ghost", onclick: async () => {
+    aiBtn.disabled = true; ai.innerHTML = `<div class="loading">本機 Ollama 評估中（約 1–2 分鐘）</div>`;
+    try { const r = await api("/api/dca/ai", { method: "POST", json: { text: d.text } }); ai.innerHTML = `<div class="md">${md(r.text)}</div>`; }
+    catch (err) { ai.innerHTML = `<div class="errbox">${esc(err.message)}</div>`; }
+    aiBtn.disabled = false;
+  } }, "🤖 AI 評估這次回測");
+  out.append(h("div", { class: "muted dca-sum" }, `${ok[0].plan}・${ok[0].start} 起`), h("div", { class: "hold-scroll" }, tbl), chart,
+    h("div", { class: "run-row" }, aiBtn, h("button", { class: "btn ghost", onclick: () => { navigator.clipboard && navigator.clipboard.writeText(d.text); flash("已複製"); } }, "複製文字")), ai);
+  requestAnimationFrame(() => {
+    const c = LightweightCharts.createChart(chart, { ...chartTheme(), autoSize: true });
+    ok.forEach((r, k) => {
+      const s2 = c.addLineSeries({ color: DCA_COLORS[k % 6], lineWidth: 2, priceLineVisible: false, title: r.symbol.replace(/\.TWO?$/, "") });
+      s2.setData(r.curve.map((x) => ({ time: x.time, value: x.value })));
+    });
+    const longest = ok.reduce((a, r) => (r.curve.length > a.curve.length ? r : a), ok[0]);
+    const inv = c.addLineSeries({ color: "#8a929a", lineWidth: 1, lineStyle: 2, priceLineVisible: false, title: "累積投入" });
+    inv.setData(longest.curve.map((x) => ({ time: x.time, value: x.invested })));
+    c.timeScale().fitContent();
+  });
+}
+
+/* ---------- 我的持股：定期定額 */
+const signed0 = (v) => (v == null ? "—" : `${v > 0 ? "+" : ""}${nf(v, 0)}`);
+
+function dcaSection(i, dd) {
+  dd = dd || { plans: [] };
+  const p = S.panes[i];
+  const sec = h("section", { class: "fx-sec dca-sec" });
+  const t = dd.total || {};
+  sec.append(h("h4", {}, "定期定額",
+    h("span", { class: "muted", style: "font-weight:400" }, dd.plans.length ? `　${dd.plans.length} 個計畫・每月約 ${nf(t.monthly || 0, 0)} 元` : "　每期自動買進台股、美股、ETF、基金、比特幣，用歷史收盤價算出累積單位")));
+  if (dd.error) sec.append(h("div", { class: "errbox" }, dd.error));
+  if (dd.plans.length && t.invested) {
+    sec.append(h("div", { class: "fx-kpis hold-kpis" },
+      h("div", {}, h("span", { class: "muted" }, "累積投入"), h("b", {}, nf(t.invested, 0))),
+      h("div", {}, h("span", { class: "muted" }, "目前市值"), h("b", {}, nf(t.value, 0))),
+      h("div", {}, h("span", { class: "muted" }, "損益"), h("b", { class: cls(t.pnl) }, signed0(t.pnl)), h("span", { class: cls(t.ret) }, pct(t.ret)))));
+  }
+  sec.append(dcaForm(i));
+  if (!dd.plans.length) return sec;
+  const tbl = h("table", { class: "grid hold-tbl dca-tbl" });
+  tbl.innerHTML = `<thead><tr><th>標的</th><th style="text-align:left">設定</th><th>期數</th><th>投入</th><th>累積單位</th><th>平均成本</th><th>市值</th><th>損益</th><th>報酬</th><th title="考慮每筆投入時間的年化報酬（XIRR）">年化</th><th>下次扣款</th><th></th></tr></thead>`;
+  const tb = h("tbody");
+  for (const r of dd.plans) {
+    const cur = r.currency && r.currency !== "TWD" ? ` ${r.currency}` : "";
+    const del = h("button", { class: "mini danger", onclick: async (e) => {
+      e.stopPropagation();
+      if (!del.dataset.armed) { del.dataset.armed = "1"; del.textContent = "確定？"; setTimeout(() => { delete del.dataset.armed; del.textContent = "刪除"; }, 3000); return; }
+      try { await api(`/api/me/dca/${r.id}`, { method: "DELETE" }); } catch (err) { flash(err.message); }
+      refreshHold(i, true);
+    } }, "刪除");
+    const lots = (r.lots || []).map((x) => `${x.date}  ${nf(x.amount, 0)} 元 → ${nf(x.units, 4)} 單位 @ ${nf(x.price, pxd(x.price))}`).join("\n");
+    tb.append(h("tr", { class: p.dcaEditing === r.id ? "hl" : "", title: lots ? `最近扣款：\n${lots}` : "" },
+      h("td", { class: "nm click", onclick: () => quickOpen(r.symbol, isFund(r.symbol) ? "FUNDD" : "GP") },
+        h("b", {}, r.symbol.replace(/\.TWO?$/, "")), " ", r.name || "", r.note ? h("span", { class: "muted" }, ` · ${r.note}`) : null),
+      h("td", { class: "nm" }, r.plan, h("span", { class: "muted" }, `　${r.start} 起${r.end ? `～${r.end}` : ""}${r.fee_pct ? `・手續費 ${r.fee_pct}%` : ""}`)),
+      ...(r.error ? [h("td", { colspan: "8", class: "muted" }, r.error)] : [
+        h("td", {}, r.n), h("td", {}, nf(r.invested, 0)), h("td", {}, nf(r.units, r.units >= 100 ? 2 : 4)),
+        h("td", {}, r.avg_cost != null ? nf(r.avg_cost, pxd(r.avg_cost)) + cur : "—"),
+        h("td", {}, nf(r.value, 0)), h("td", { class: cls(r.pnl) }, signed0(r.pnl)), h("td", { class: cls(r.ret) }, pct(r.ret)),
+        h("td", { class: cls(r.xirr) }, pct(r.xirr))]),
+      h("td", { class: "muted" }, r.next || (r.end ? "已結束" : "—")),
+      h("td", { class: "nm" },
+        h("button", { class: "mini", title: "用同樣設定在側欄回測、比較單筆投入", onclick: () => { openSide("dca"); dcaPrefill({ symbols: r.symbol, amount: r.amount, freq: r.freq, days: r.days, start: r.start, end: r.end || "", fee_pct: r.fee_pct }); } }, "回測"),
+        h("button", { class: "mini", onclick: () => { S.panes[i].dcaEditing = r.id; S.panes[i].dcaRow = r; renderPane(i); } }, "編輯"), del)));
+  }
+  tbl.append(tb);
+  sec.append(h("div", { class: "hold-scroll" }, tbl),
+    h("div", { class: "muted dca-note" }, "依每期扣款日（遇假日順延到下一個交易日）的收盤價計算；台股與 ETF 用還原權息價（股利再投入），基金用淨值（配息型不含配息），美元資產以當天匯率換算台幣。不含稅，實際成交以券商為準。"));
+  return sec;
+}
+
+function dcaForm(i) {
+  const p = S.panes[i];
+  const r = p.dcaEditing ? p.dcaRow || {} : {};
+  const sym = h("input", { placeholder: "定期定額標的：0050、VOO、BTC-USD、基金名稱", value: r.symbol || "", spellcheck: "false" });
+  const amount = h("input", { type: "number", step: "1", min: "1", placeholder: "每期金額（台幣）", value: r.amount ?? "" });
+  const freq = h("select", {}, ...Object.entries({ monthly: "每月", weekly: "每週", daily: "每個交易日" }).map(([k, l]) => h("option", { value: k, ...((r.freq || "monthly") === k ? { selected: "" } : {}) }, l)));
+  const days = h("input", { class: "dca-days", placeholder: "扣款日 6,16,26", value: r.days || "6" });
+  const start = h("input", { type: "date", value: r.start || new Date().toLocaleDateString("sv-SE"), title: "開始扣款日（可填過去日期，系統會補算已經扣過的每一期）" });
+  const end = h("input", { type: "date", value: r.end || "", title: "停扣日（選填）" });
+  const fee = h("input", { type: "number", step: "0.0001", min: "0", class: "dca-fee", value: r.fee_pct ?? 0.1425, title: "手續費 %（台股券商定期定額常見 0.1425% 打折、最低 1 元；美股複委託請自填）" });
+  const note = h("input", { placeholder: "備註", value: r.note || "", class: "dca-note-in" });
+  const msg = h("span", { class: "hold-msg" });
+  const syncDays = () => { days.placeholder = freq.value === "weekly" ? "星期 1–5，例 1" : freq.value === "monthly" ? "扣款日 6,16,26" : "—"; days.disabled = freq.value === "daily"; };
+  freq.addEventListener("change", () => { if (freq.value === "weekly") days.value = "1"; else if (freq.value === "monthly") days.value = "6"; syncDays(); });
+  syncDays();
+  const save = h("button", { class: "btn", type: "submit" }, p.dcaEditing ? "儲存定期定額" : "新增定期定額");
+  const form = h("form", { class: "hold-form dca-form" }, sym, amount, freq, days, start, end, h("span", { class: "muted" }, "手續費%"), fee, note, save,
+    p.dcaEditing ? h("button", { class: "btn ghost", type: "button", onclick: () => { S.panes[i].dcaEditing = null; renderPane(i); } }, "取消") : null, msg);
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    msg.textContent = "";
+    let s2 = sym.value.trim();
+    if (!s2) { msg.textContent = "請輸入標的"; return; }
+    if (!isFund(s2.toUpperCase()) && (/[一-鿿]/.test(s2) || /^\d{4,6}[A-Z]?$/i.test(s2) || !/[.=^-]/.test(s2))) {
+      const r2 = await resolveSec(s2);
+      if (!r2) { msg.textContent = `找不到「${s2}」`; return; }
+      s2 = r2;
+    }
+    save.disabled = true;
+    try {
+      const b = { symbol: s2, amount: amount.value, freq: freq.value, days: days.value, start: start.value, end: end.value, fee_pct: fee.value, min_fee: 1, note: note.value };
+      if (S.panes[i].dcaEditing) await api(`/api/me/dca/${S.panes[i].dcaEditing}`, { method: "PUT", json: b });
+      else await api("/api/me/dca", { method: "POST", json: b });
+      S.panes[i].dcaEditing = null;
+      renderPane(i);
+    } catch (err) { msg.textContent = err.message; save.disabled = false; }
+  });
+  return form;
 }
 
 function scIdByName(name) {

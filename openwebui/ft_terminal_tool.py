@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.10.0
+version: 0.11.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -186,6 +186,21 @@ class Tools:
         """
         await self._status(__event_emitter__, "台幣匯率")
         out = await self._get("twfx", {"q": currencies}, timeout=120)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def dca_backtest(self, symbols: str, amount: float = 5000, years: float = 5, days: str = "6",
+                           __event_emitter__: Emitter = None) -> str:
+        """
+        定期定額回測：過去每月固定日期買進（台股、美股、ETF、基金 FUND:代號、比特幣 BTC-USD），算投入、市值、報酬、年化（XIRR）、最大回撤，並對比同金額第一期單筆投入。
+        :param symbols: 標的，逗號分隔（最多 6 個），例 "0050,VOO,BTC-USD"
+        :param amount: 每期金額（台幣）
+        :param years: 回測年數
+        :param days: 每月扣款日，例 "6" 或 "6,16,26"
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, "定期定額回測")
+        out = await self._get("dca", {"q": symbols, "amount": amount, "years": years, "days": days}, timeout=180)
         await self._status(__event_emitter__, "完成", True)
         return out
 

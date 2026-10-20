@@ -88,6 +88,10 @@ def _conn() -> sqlite3.Connection:
         symbol TEXT NOT NULL, shares REAL NOT NULL, cost REAL NOT NULL, opened TEXT, note TEXT,
         created TEXT NOT NULL, updated TEXT NOT NULL);
     CREATE INDEX IF NOT EXISTS holdings_user ON holdings(user_id);
+    CREATE TABLE IF NOT EXISTS dca_plans(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        symbol TEXT NOT NULL, amount REAL NOT NULL, freq TEXT NOT NULL, days TEXT NOT NULL, start TEXT NOT NULL, end_date TEXT,
+        fee_pct REAL NOT NULL DEFAULT 0.1425, min_fee REAL NOT NULL DEFAULT 1, note TEXT, created TEXT NOT NULL, updated TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS dca_user ON dca_plans(user_id);
     CREATE TABLE IF NOT EXISTS totp(user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
         secret TEXT NOT NULL, enabled INTEGER NOT NULL DEFAULT 0, last_step INTEGER NOT NULL DEFAULT 0, created TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS totp_recovery(id INTEGER PRIMARY KEY, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -614,6 +618,113 @@ def export_csv(req: Request):
         w.writerow([sym, shares, cost, opened or "", note or ""])
     return Response("﻿" + buf.getvalue(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": "attachment; filename=holdings.csv", "Cache-Control": "no-store"})
+
+
+# ------------------------------------------------------------------ 定期定額 plans (computed from prices on the fly)
+def _dca_clean(b: dict) -> tuple:
+    from ft_common import dca
+    sym = (b.get("symbol") or "").strip()
+    if not sym or len(sym) > 40:
+        raise HTTPException(400, "請輸入標的")
+    try:
+        amount = float(b.get("amount"))
+        fee_pct = float(b.get("fee_pct", 0.1425) or 0)
+        min_fee = float(b.get("min_fee", 1) or 0)
+    except (TypeError, ValueError) as e:
+        raise HTTPException(400, "金額與手續費要是數字") from e
+    if not 1 <= amount <= 1e8 or not 0 <= fee_pct <= 5 or not 0 <= min_fee <= 1000:
+        raise HTTPException(400, "每期金額 1 元～1 億、手續費 0–5%")
+    freq = b.get("freq") or "monthly"
+    if freq not in dca.FREQS:
+        raise HTTPException(400, "頻率只能是每月／每週／每日")
+    try:
+        days = ",".join(str(d) for d in dca.parse_days(freq, b.get("days") or ""))
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    start = (b.get("start") or "").strip()[:10]
+    end = (b.get("end") or "").strip()[:10] or None
+    for d in (start, end):
+        if d and not re.fullmatch(r"\d{4}-\d{2}-\d{2}", d):
+            raise HTTPException(400, "日期格式 YYYY-MM-DD")
+    if not start:
+        raise HTTPException(400, "請輸入開始扣款日期")
+    return sym, amount, freq, days, start, end, fee_pct, min_fee, (b.get("note") or "").strip()[:200]
+
+
+def dca_portfolio(user_id: int) -> dict:
+    from ft_common import dca
+    with _conn() as c:
+        rows = c.execute("SELECT id, symbol, amount, freq, days, start, end_date, fee_pct, min_fee, note FROM dca_plans "
+                         "WHERE user_id=? ORDER BY id", (user_id,)).fetchall()
+    out, tot = [], {"invested": 0.0, "value": 0.0}
+    for pid, sym, amount, freq, days, start, end, fee_pct, min_fee, note in rows:
+        base = {"id": pid, "symbol": sym, "amount": amount, "freq": freq, "days": days, "start": start, "end": end,
+                "fee_pct": fee_pct, "min_fee": min_fee, "note": note, "name": name_fn(sym) if name_fn else None,
+                "plan": dca.describe(freq, dca.parse_days(freq, days), amount)}
+        try:
+            if start > dt.date.today().isoformat():
+                raise ValueError(f"{start} 開始扣款")
+            r = dca.simulate(sym, amount, freq, days, start, end, fee_pct, min_fee, lots_out=6)
+            r.pop("curve", None)
+            base.update({k: r[k] for k in ("n", "invested", "fees", "units", "avg_cost", "last_price", "value", "pnl", "ret",
+                                           "xirr", "mdd", "next", "lots", "currency", "price_note")})
+            tot["invested"] += r["invested"]
+            tot["value"] += r["value"]
+        except Exception as e:  # noqa: BLE001
+            base["error"] = str(e)[:160]
+            if start > dt.date.today().isoformat():
+                base["next"] = start
+        out.append(base)
+    tot["pnl"] = tot["value"] - tot["invested"]
+    tot["ret"] = (tot["value"] / tot["invested"] - 1) * 100 if tot["invested"] else None
+    tot["monthly"] = sum(p["amount"] * (len(p["days"].split(",")) if p["freq"] == "monthly" else
+                                        4.33 * len(p["days"].split(",")) if p["freq"] == "weekly" else 21)
+                         for p in out if not p.get("end") or p["end"] >= dt.date.today().isoformat())
+    return {"plans": out, "total": tot, "at": _now()}
+
+
+@router.get("/api/me/dca")
+def list_dca(req: Request, resp: Response):
+    _no_store(resp)
+    u = require_user(req)
+    return dca_portfolio(u["id"])
+
+
+@router.post("/api/me/dca")
+async def add_dca(req: Request):
+    _csrf(req)
+    u = require_user(req)
+    v = _dca_clean(await req.json())
+    with _lock, _conn() as c:
+        if c.execute("SELECT COUNT(*) FROM dca_plans WHERE user_id=?", (u["id"],)).fetchone()[0] >= 100:
+            raise HTTPException(400, "最多 100 個定期定額")
+        cur = c.execute("INSERT INTO dca_plans(user_id,symbol,amount,freq,days,start,end_date,fee_pct,min_fee,note,created,updated) "
+                        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)", (u["id"], *v, _now(), _now()))
+    return {"id": cur.lastrowid}
+
+
+@router.put("/api/me/dca/{pid}")
+async def edit_dca(pid: int, req: Request):
+    _csrf(req)
+    u = require_user(req)
+    v = _dca_clean(await req.json())
+    with _lock, _conn() as c:
+        cur = c.execute("UPDATE dca_plans SET symbol=?, amount=?, freq=?, days=?, start=?, end_date=?, fee_pct=?, min_fee=?, note=?, "
+                        "updated=? WHERE id=? AND user_id=?", (*v, _now(), pid, u["id"]))
+    if not cur.rowcount:
+        raise HTTPException(404, "找不到這個定期定額")
+    return {"ok": True}
+
+
+@router.delete("/api/me/dca/{pid}")
+def delete_dca(pid: int, req: Request):
+    _csrf(req)
+    u = require_user(req)
+    with _lock, _conn() as c:
+        cur = c.execute("DELETE FROM dca_plans WHERE id=? AND user_id=?", (pid, u["id"]))
+    if not cur.rowcount:
+        raise HTTPException(404, "找不到這個定期定額")
+    return {"ok": True}
 
 
 # ------------------------------------------------------------------ admin CLI
