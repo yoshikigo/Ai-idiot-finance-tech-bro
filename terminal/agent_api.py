@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from ft_common import context, dca, edgar, fomc, toolkit, events, focus, fred, funds, fx, ledger, notes, supplychain, twmarket, world
+from ft_common import context, dca, edgar, fomc, toolkit, events, focus, fred, funds, fx, ledger, notes, supplychain, twmacro, twmarket, world
 
 router = APIRouter(prefix="/api/agent")
 _hooks: dict = {}  # set by app.py: settings loader, llm block, engines map
@@ -250,6 +250,13 @@ def kit_text(kind: str, q: str = "", expiry: str = "", market: str = "all", plai
 def liquidity_text(plain: bool = False, format: str = "text"):  # noqa: A002
     """Fed 淨流動性（資產負債表 − 財政部 TGA − 隔夜逆回購）：最新值、4／13／52 週變化、組成、與 S&P 500 的相關。"""
     return _out(fred.liquidity_text(), plain, None, format)
+
+
+@router.get("/twmacro")
+def twmacro_text(plain: bool = False, format: str = "text"):  # noqa: A002
+    """台灣總經：景氣對策信號（分數與燈號）、領先／同時指標、經濟成長率、CPI 與核心 CPI 年增率、失業率、
+    央行重貼現率、隔夜拆款利率、M1B／M2 年增率（國發會、主計總處、中央銀行）。"""
+    return _out(twmacro.text(), plain, twmacro.snapshot() if format == "json" else None, format)
 
 
 @router.get("/fomc")
@@ -591,6 +598,7 @@ HELP = """FT Terminal agent API（全部 GET，除了 analyze）
 /api/agent/watchlist   /api/agent/brief           自選清單 / 盤後簡報
 /api/agent/focus                                  今日焦點（供應鏈題材漲跌、強弱勢股、三大法人、新聞、AI 今日重點）
 /api/agent/macro                                  美國總經（FRED）
+/api/agent/twmacro                                台灣總經（景氣燈號、經濟成長率、CPI、失業率、重貼現率、M1B／M2）
 /api/agent/sec?q=NVDA                             美股 SEC 最近申報＋年度財報（需 FT_SEC_USER_AGENT）
 /api/agent/ledger                                 AI 分析紀錄：各 agent 5／20／60 日命中率、最近檢討與提醒
 /api/agent/events?days=365                        近一年市場重大事件（指數大波動、Fed 決策、自訂）＋AI 摘要

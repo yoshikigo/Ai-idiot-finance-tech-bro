@@ -64,9 +64,9 @@ const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: 
 const KIT_TABS = [["tech", "技術面"], ["options", "選擇權"], ["research", "評等籌碼"], ["earnings", "財報季"], ["value", "價值檢查"], ["intel", "市場情報"]];
 const KIT_WORD = { "技術": "tech", "技術面": "tech", "技術分析": "tech", "選擇權": "options", "期權": "options", "評等": "research", "籌碼": "research", "目標價": "research", "法人": "research", "財報季": "earnings", "EPS": "earnings", "法說": "earnings", "價值": "value", "價值投資": "value", "情報": "intel", "類股輪動": "intel", "市場情報": "intel", "工具箱": "tech" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
-const MON_TITLE = { TWFX: "台幣匯率", MACRO: "美國總經（FRED）", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
+const MON_TITLE = { TWFX: "台幣匯率", MACRO: "美國總經（FRED）", TWMACRO: "台灣總經", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
 const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
-const ZH_CMD = { "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
+const ZH_CMD = { "台灣總經": "TWMACRO", "台經": "TWMACRO", "國內總經": "TWMACRO", "景氣燈號": "TWMACRO", "燈號": "TWMACRO", "景氣": "TWMACRO", "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
   "持股": "HOLD", "我的持股": "HOLD", "庫存": "HOLD", "登入": "HOLD", "走勢": "GP", "K線": "GP", "線圖": "GP", "盤中": "GIP", "概況": "DES", "資料": "DES", "新聞": "N", "財報": "FA",
   "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "TWFX", "台幣": "TWFX", "台幣匯率": "TWFX", "換匯": "TWFX", "商品": "CMDTY", "原物料": "CMDTY",
   "利率": "RATES", "加密": "CRYPTO", "說明": "HELP", "幫助": "HELP", "研究": "LAB", "策略": "LAB", "回測": "LAB", "選股": "LAB", "策略研究": "LAB", "資料庫": "DATA", "目錄": "DATA", "基金": "FUND", "熱門ETF": "TWETF", "ETF排行": "ETF",
@@ -155,7 +155,7 @@ function clocks() {
 
 function buildFkeys() {
   const keys = [
-    ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
+    ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["TWMACRO", "台經"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
     ["CMDTY", "商品"], ["RATES", "利率"], ["CRYPTO", "加密"], "|", ["GP", "走勢"], ["GIP", "盤中"], ["DES", "概況"], ["N", "新聞"], ["FA", "財報"], "|",
     ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
   ];
@@ -249,6 +249,7 @@ async function run(raw) {
   if (head === "EVENTS" || head === "EV") return setPane(target, { fn: "EVENTS" });
   if (head === "LEDGER" || head === "LOG") return setPane(target, { fn: "LEDGER", lgQ: tail.join(" ") });
   if (head === "TWFX") return setPane(target, { fn: "TWFX", fxSel: tail.join(" ") || S.panes[target].fxSel || "" });
+  if (head === "TWMACRO" || head === "TWM") return setPane(target, { fn: "TWMACRO", twmId: (tail[0] || "").toUpperCase() || S.panes[target].twmId || "" });
   if (head === "MACRO") return setPane(target, { fn: "MACRO", fredId: (tail[0] || "").toUpperCase() || S.panes[target].fredId || "" });
   if (head === "HOLD") return setPane(target, { fn: "HOLD" });
   if (head === "SC") {
@@ -360,7 +361,7 @@ function renderPane(i) {
     fns.append(h("button", { title: "TradingAgents 多代理人分析", onclick: (e) => { e.stopPropagation(); openSide("tradingagents"); prefillEngine("tradingagents", p.sec); } }, "AI▸"));
   }
   fns.append(h("button", { title: "最大化", onclick: (e) => { e.stopPropagation(); toggleMax(i); } }, "⤢"));
-  const R = { KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
+  const R = { KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
               ETFM: renderETFMon, FUNDS: renderFundSearch, FUNDD: renderFund, WORLD: renderWorld, LAYA: renderLaya, LAB: renderLab, DATA: renderData };
   if (R[p.fn]) R[p.fn](i, body, p);
   else if (MON_FNS.includes(p.fn)) renderMon(i, body, p);
@@ -1512,6 +1513,7 @@ function renderHelp(i, body) {
   body.innerHTML = `<div class="help">
   <h4>指令（直接打字進入指令列，Enter 或 GO 執行；中文名稱、代號都可以）</h4>
   <table>
+    <tr><td>台灣總經（TWMACRO）· 台經 · 景氣燈號</td><td>國發會景氣對策信號（分數與燈號）、領先／同時指標、經濟成長率、CPI／核心 CPI、失業率、央行重貼現率、隔夜拆款利率、M1B／M2 年增率（含黃金／死亡交叉）；點一列看長期走勢，可疊加權指數</td></tr>
     <tr><td>總經（MACRO）· 總經 DGS10</td><td>美國總經（FRED 官方）：Fed 利率、美債殖利率與利差、CPI／PCE、失業率、非農、GDP、信心、衰退機率、信用利差、VIX、美元、M2、油價；點一列看長期走勢（可加上 Fed 決策標記）</td></tr>
     <tr><td>紀錄（LEDGER）· 紀錄 2330</td><td>分析紀錄與檢討：每次 AI 分析的時間、Agent／模型、標的、結論；5／20／60 個交易日後自動用實際股價核對對錯與超額報酬；各 Agent 命中率；「🤖 AI 檢討」整理成給該 Agent 的提醒，下次分析自動帶入（可關）</td></tr>
     <tr><td>大事（EVENTS）</td><td>重大事件：近一年指數大漲大跌（自動偵測）、Fed 利率決策日、你自己加的事件，附當時新聞與 AI 摘要；指數走勢圖預設顯示「📌 大事」標記（滑過看說明、點一下跳到這頁）</td></tr>
@@ -3247,7 +3249,7 @@ async function renderMacro(i, body, p) {
   const chartBox = h("div", { class: "mc-chart hidden" });
   const holder = h("div", {}, h("div", { class: "loading" }, "讀取 FRED 總經數據"));
   body.append(h("div", { class: "ranges" }, h("span", { class: "legend", style: "margin-left:0" }, "資料：FRED（St. Louis Fed）。年增率由原始指數計算；點一列看走勢"),
-    h("span", { class: "grow" }), h("button", { onclick: () => { setFocus(i); askSend("根據目前的美國總經數據（Fed 利率、殖利率曲線、通膨、就業、景氣、金融情勢），整理現在的景氣位置與對股市的意涵，並指出最值得注意的變化。"); } }, "問 AI 總經 ▸")), chartBox, holder);
+    h("span", { class: "grow" }), h("button", { onclick: () => setPane(i, { fn: "TWMACRO" }) }, "台灣總經 ▸"), h("button", { onclick: () => { setFocus(i); askSend("根據目前的美國總經數據（Fed 利率、殖利率曲線、通膨、就業、景氣、金融情勢），整理現在的景氣位置與對股市的意涵，並指出最值得注意的變化。"); } }, "問 AI 總經 ▸")), chartBox, holder);
   let d;
   try { d = await api("/api/macro"); } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
   if (S.panes[i].fn !== "MACRO") return;
@@ -3327,6 +3329,99 @@ async function macroChart(i, box, id, p) {
         s.setMarkers(mk);
       } catch (e) {}
     }
+  });
+}
+
+/* ---------- 台灣總經：國發會景氣燈號、主計總處 GDP／CPI／失業率、央行利率與貨幣供給 */
+const twmFmt = (v, r) => (v == null ? "—" : r.id === "DISCOUNT" ? nf(v, 3) : r.id === "SIGNAL" ? nf(v, 0) : nf(v, 2)) + (r.unit === "%" ? "%" : "");
+const lightChip = (l) => (l ? h("span", { class: "tw-light", style: `--lc:${l.color}` }, l.name) : "");
+
+async function renderTWMacro(i, body, p) {
+  body.classList.add("mc-body");
+  const chartBox = h("div", { class: "mc-chart hidden" });
+  const holder = h("div", {}, h("div", { class: "loading" }, "讀取台灣總經（國發會、主計總處、中央銀行）"));
+  body.append(h("div", { class: "ranges" },
+    h("span", { class: "legend", style: "margin-left:0" }, "資料：國發會、主計總處、中央銀行。年增率由原始指數計算；點一列看長期走勢（可疊加權指數）"),
+    h("span", { class: "grow" }), h("button", { onclick: () => setPane(i, { fn: "MACRO" }) }, "美國總經 ▸"),
+    h("button", { onclick: () => { setFocus(i); askSend("根據目前的台灣總經數據（景氣對策信號與領先指標、經濟成長率、CPI 與核心 CPI、失業率、央行重貼現率、M1B／M2 年增率與資金動能），整理台灣現在的景氣位置、央行可能的方向，以及對台股的意涵。"); } }, "問 AI 台灣總經 ▸")),
+    chartBox, holder);
+  let d;
+  try { d = await api("/api/twmacro"); } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  if (S.panes[i].fn !== "TWMACRO") return;
+  holder.innerHTML = "";
+  const by = Object.fromEntries(d.rows.map((r) => [r.id, r]));
+  // headline cards: 燈號, 經濟成長率, CPI, 重貼現率, M1B−M2
+  const sig = by.SIGNAL, cards = h("div", { class: "tw-cards" });
+  const card = (label, val, sub, extra) => h("div", { class: "tw-card" }, h("small", { class: "muted" }, label), h("b", {}, val), extra || "", h("small", { class: "muted" }, sub || ""));
+  if (sig && sig.value != null) cards.append(card("景氣對策信號", `${nf(sig.value, 0)} 分`, `${sig.date}${sig.prev_light ? `｜前月 ${sig.prev_light.name}` : ""}`, lightChip(sig.light)));
+  for (const id of ["GDP", "CPI", "UNEMP", "DISCOUNT"]) { const r = by[id]; if (r && r.value != null) cards.append(card(r.name, twmFmt(r.value, r), id === "DISCOUNT" ? `${r.changed} 起` : r.date)); }
+  if (by.M1B && by.M2 && by.M1B.value != null && by.M2.value != null) {
+    const gap = by.M1B.value - by.M2.value;
+    cards.append(card("M1B − M2", (gap > 0 ? "+" : "") + nf(gap, 2) + " 百分點", gap > 0 ? "黃金交叉：活錢多於定存，資金動能偏多" : "死亡交叉：資金偏向定存，動能轉弱"));
+  }
+  holder.append(cards);
+  const bad = d.rows.filter((r) => r.error);
+  if (bad.length) holder.append(h("div", { class: "errbox" }, `${bad.length} 項抓不到：${bad.map((r) => r.name).join("、")}（${bad[0].error}）　診斷：/api/twmacro/diag`));
+  for (const g of d.groups) {
+    const rows = d.rows.filter((r) => r.group === g && !r.error);
+    if (!rows.length) continue;
+    const t = h("table", { class: "grid mc-tbl" });
+    t.innerHTML = `<thead><tr><th>${esc(g)}</th><th>最新</th><th>期間</th><th>前期</th><th>變動</th><th>一年前</th><th>近 3 年</th></tr></thead>`;
+    const tb = h("tbody");
+    for (const r of rows) {
+      tb.append(h("tr", { class: "click" + (p.twmId === r.id ? " hl" : ""), title: r.note, onclick: () => setPane(i, { twmId: p.twmId === r.id ? "" : r.id }) },
+        h("td", { class: "nm" }, r.name, r.light ? lightChip(r.light) : ""), h("td", {}, h("b", {}, twmFmt(r.value, r))),
+        h("td", { class: "muted" }, r.id === "DISCOUNT" ? `${r.changed} 起` : r.date),
+        h("td", {}, twmFmt(r.prev, r)), h("td", { class: cls(r.chg) }, r.chg == null ? "—" : (r.chg > 0 ? "+" : "") + nf(r.chg, r.id === "DISCOUNT" ? 3 : 2)),
+        h("td", {}, twmFmt(r.y1, r)), h("td", { html: sparkSvg(r.spark) })));
+    }
+    t.append(tb);
+    holder.append(t);
+  }
+  holder.append(h("div", { class: "legend tw-bands" }, "燈號：", ...d.lights.slice().reverse().map((l) => lightChip({ name: `${l.name} ${l.from || 9}+`, color: l.color }))));
+  if (p.twmId) twMacroChart(i, chartBox, p.twmId, p);
+}
+
+async function twMacroChart(i, box, id, p) {
+  box.classList.remove("hidden");
+  const yrs = p.twmYears || 10;
+  const twiiOn = p.twmTwii === undefined || p.twmTwii === null ? ["SIGNAL", "LEADING", "M1B", "M2", "GDP"].includes(id) : !!p.twmTwii;
+  const bar = h("div", { class: "ranges" });
+  const area = h("div", { class: "mc-area" });
+  box.append(bar, area);
+  let d;
+  try { d = await api(`/api/twmacro/series?id=${encodeURIComponent(id)}&years=${yrs}`); } catch (e) { area.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  bar.append(h("b", { style: "color:var(--amber)" }, d.name), h("span", { class: "muted" }, d.note ? `　${d.note}` : ""),
+    h("span", { class: "grow" }), ...[[2, "2 年"], [5, "5 年"], [10, "10 年"], [20, "20 年"], [300, "全部"]].map(([y, l]) =>
+      h("button", { class: yrs === y ? "on" : "", onclick: () => setPane(i, { twmYears: y }) }, l)),
+    h("button", { class: twiiOn ? "on" : "", title: "在左軸疊上加權指數對照", onclick: () => setPane(i, { twmTwii: !twiiOn }) }, "疊加權指數"),
+    h("button", { onclick: () => setPane(i, { twmId: "" }) }, "✕"));
+  if (!d.points.length) { area.innerHTML = `<div class="empty">沒有資料</div>`; return; }
+  requestAnimationFrame(async () => {
+    const chart = LightweightCharts.createChart(area, { ...chartTheme(), autoSize: true });
+    const fmt = { type: "price", precision: id === "DISCOUNT" || id === "OVERNIGHT" ? 3 : 2, minMove: 0.001 };
+    let s;
+    if (id === "SIGNAL") {
+      s = chart.addHistogramSeries({ priceFormat: { type: "price", precision: 0, minMove: 1 }, base: 9 });
+      s.setData(d.points.map((x) => ({ time: x.time, value: x.value, color: x.color || cssVar("--amber") })));
+      for (const [v, c] of [[38, "#ff4d4f"], [32, "#ff9f40"], [23, "#3ad67a"], [17, "#d6c43a"]]) s.createPriceLine({ price: v - 0.5, color: c, lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    } else {
+      s = chart.addLineSeries({ color: cssVar("--amber"), lineWidth: 2, lineType: d.step ? 1 : 0, priceFormat: fmt });
+      s.setData(d.points.map((x) => ({ time: x.time, value: x.value })));
+      if (d.unit === "%" && !["DISCOUNT", "OVERNIGHT", "UNEMP"].includes(id)) s.createPriceLine({ price: 0, color: "#5b636b", lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    }
+    if (twiiOn) {
+      try {
+        const rng = yrs <= 2 ? "2y" : yrs <= 5 ? "5y" : yrs <= 10 ? "10y" : "max";
+        const tw = await api(`/api/history?s=%5ETWII&range=${rng}`);
+        chart.applyOptions({ leftPriceScale: { visible: true, borderColor: "#2a2f35" } });
+        const l = chart.addLineSeries({ color: "#4ba3ff", lineWidth: 1, priceScaleId: "left", priceLineVisible: false, title: "加權指數" });
+        const t0 = d.points[0].time;
+        l.setData(tw.filter((x) => x.time >= t0).map((x) => ({ time: x.time, value: x.close })));
+      } catch (e) {}
+    }
+    chart.timeScale().fitContent();
+    S.charts.set(i, { chart, fit: () => chart.timeScale().fitContent() });
   });
 }
 

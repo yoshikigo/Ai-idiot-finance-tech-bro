@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from ft_common import context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmarket, world
+from ft_common import context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmacro, twmarket, world
 
 DATA = Path(os.environ.get("FT_DATA", "/data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -416,6 +416,9 @@ async def api_translate(req: Request):
 
 
 # ------------------------------------------------------------------ ASK (streaming chat)
+TW_MACRO_WORDS = ("台灣總經", "景氣燈號", "景氣對策", "對策信號", "藍燈", "紅燈", "黃紅燈", "黃藍燈", "重貼現率", "央行",
+                  "M1B", "資金動能", "國發會", "主計", "台灣經濟", "台灣通膨", "台灣 GDP", "台灣GDP", "拆款")
+TW_MACRO_HINTS = ("總經", "經濟", "景氣", "通膨", "CPI", "物價", "失業", "GDP", "成長率", "利率", "升息", "降息", "M2", "資金")
 WORLD_WORDS = ("世界", "地緣", "地震", "戰", "軍", "航運", "船", "油價", "颱風", "颶風", "海峽", "事件", "風險", "紅海",
                "荷莫茲", "南海", "供應鏈", "天災", "衝突")
 
@@ -466,6 +469,12 @@ async def api_ask(req: Request):
     if any(k in last_q for k in ("匯率", "台幣", "新台幣", "美元", "日圓", "日幣", "人民幣", "歐元", "韓元", "換匯", "升值", "貶值")):
         try:
             parts.append(await run_in_threadpool(fx.text, None))
+        except Exception:  # noqa: BLE001
+            pass
+    if any(k in last_q for k in TW_MACRO_WORDS) or (any(k in last_q for k in ("台灣", "台股", "國內", "我國"))
+                                                    and any(k in last_q for k in TW_MACRO_HINTS)):
+        try:
+            parts.append(await run_in_threadpool(twmacro.text, None))
         except Exception:  # noqa: BLE001
             pass
     if any(k in last_q for k in ("流動性", "資金面", "淨流動性", "逆回購", "TGA", "縮表", "QT", "QE", "資產負債表", "熱錢")):
@@ -921,6 +930,27 @@ def api_macro_series(id: str, years: float = 10):  # noqa: A002
         return {"id": id, "name": meta[0], "unit": meta[1], "how": meta[2], "note": meta[4], "points": fred.history(id, years)}
     except Exception as e:  # noqa: BLE001
         _err(e)
+
+
+@app.get("/api/twmacro")
+def api_twmacro():
+    return {"rows": twmacro.snapshot(), "groups": twmacro.GROUPS, "lights": [
+        {"from": lo, "name": n, "color": c} for lo, n, c in twmacro.LIGHTS]}
+
+
+@app.get("/api/twmacro/series")
+def api_twmacro_series(id: str, years: float = 10):  # noqa: A002
+    if id not in twmacro.SERIES:
+        raise HTTPException(404, "unknown series")
+    try:
+        return twmacro.history(id, years)
+    except Exception as e:  # noqa: BLE001
+        _err(e)
+
+
+@app.get("/api/twmacro/diag")
+def api_twmacro_diag():
+    return twmacro.diag()
 
 
 # ------------------------------------------------------------------ 分析紀錄與檢討

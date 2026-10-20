@@ -720,3 +720,11 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .sep-tbl td:nth-child(n+2), .sep-tbl th:nth-child(n+2) { text-align: right; }
 .sep-tbl small { font-size: 10px; }
 .mc-sep { padding: 6px 8px; }
+/* 台灣總經 */
+.tw-cards { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
+.tw-card { display: flex; flex-direction: column; gap: 2px; min-width: 120px; padding: 6px 10px; border: 1px solid #2a2f35; background: rgba(255, 255, 255, .02); }
+.tw-card b { font-size: 1.25em; color: var(--amber); }
+.tw-light { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 8px; font-size: .85em; color: #0b0d10; background: var(--lc); white-space: nowrap; }
+.tw-card .tw-light { margin-left: 0; align-self: flex-start; }
+.tw-bands { margin: 4px 0 8px; }
+.tw-bands .tw-light { margin-left: 4px; }

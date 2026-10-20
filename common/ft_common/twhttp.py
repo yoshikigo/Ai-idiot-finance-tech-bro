@@ -22,7 +22,7 @@ import httpx
 
 log = logging.getLogger("ft.twhttp")
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36 fin-terminal"
-GOV_HOSTS = ("twse.com.tw", "tpex.org.tw", "sitca.org.tw", "tdcc.com.tw")
+GOV_HOSTS = ("twse.com.tw", "tpex.org.tw", "sitca.org.tw", "tdcc.com.tw", "gov.tw")  # gov.tw: some 主計總處 hosts omit the intermediate cert
 CACHE_DIR = Path(os.environ.get("FT_DATA", "/data")) / "cache" / "tw"
 
 _ctx = ssl.create_default_context()
