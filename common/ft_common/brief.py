@@ -16,11 +16,13 @@ import math
 
 import pandas as pd
 
-from . import twmarket
+from . import market, twmarket
 
 log = logging.getLogger("ft.brief")
 MAX_CHARS = 6000
-PARTS = {"news": "中文新聞", "flows": "籌碼（三大法人、融資券）", "revenue": "月營收", "sector": "產業強弱",
+PARTS = {"news": "中文新聞", "news_us": "英文新聞", "flows": "籌碼（三大法人、融資券）", "revenue": "月營收", "sector": "產業強弱",
+         "fx": "台幣匯率", "etf": "ETF 資料（淨值、折溢價、配息、成分股）", "valuation": "官方估值與財報、除權息",
+         "fomc": "FOMC 文件（聲明變化、SEP、紀要）", "others": "其他 AI 的結論", "supply": "供應鏈上下游", "world": "世界訊號",
          "tw_macro": "台灣總經", "us_macro": "美國總經", "events": "重大事件與日程", "sec": "SEC 最近申報"}
 
 
@@ -124,7 +126,8 @@ def sector_section(sym: str) -> str:
 
 
 TW_MACRO_IDS = ("SIGNAL", "LEADING", "GDP", "CPI", "CORE", "UNEMP", "DISCOUNT", "M1B", "M2")
-US_MACRO_IDS = ("DFEDTARU", "DGS2", "DGS10", "T10Y2Y", "CPIAUCSL", "PCEPILFE", "UNRATE", "BAMLH0A0HYM2", "VIXCLS", "NETLIQ")
+US_MACRO_IDS = ("DFEDTARU", "DGS2", "DGS10", "T10Y2Y", "CPIAUCSL", "PCEPILFE", "UNRATE", "BAMLH0A0HYM2", "VIXCLS", "DTWEXBGS",
+                "NETLIQ")
 
 
 def tw_macro_section(as_of: str | None) -> str:
@@ -204,29 +207,215 @@ def sec_section(sym: str) -> str:
     return edgar.filings_text(sym, 6)
 
 
+# ------------------------------------------------------------------ batch 1 & 2 sections
+FX_TW = ("USD", "JPY", "CNY", "EUR", "KRW")
+
+
+def fx_section(as_of: str | None) -> str:
+    from . import fx
+    period = "2y" if is_live(as_of) or as_of >= (dt.date.today() - dt.timedelta(days=600)).isoformat() else "10y"
+    lines = []
+    for code in FX_TW:
+        try:
+            s = fx.series(code, period)
+        except Exception:  # noqa: BLE001
+            continue
+        v, t = _at(s, as_of)
+        if v is None:
+            continue
+        s = s[s.index <= t]
+        unit = fx.UNIT.get(code, 1)
+        ch = []
+        for lab, days in (("1 月", 30), ("3 月", 91), ("1 年", 365)):
+            p = _ago(s, t, days)
+            if p:
+                ch.append(f"{lab} {(v / p - 1) * 100:+.2f}%")
+        lines.append(f"- {unit if unit > 1 else 1} {code}（{fx.CCY[code][0]}）＝ {v * unit:,.4f} 台幣（{t:%Y-%m-%d}；{'、'.join(ch)}）")
+    if not lines:
+        return ""
+    return "【台幣匯率】（漲＝外幣升值、台幣貶值；出口股通常受惠台幣貶值）\n" + "\n".join(lines)
+
+
+def etf_section(sym: str, as_of: str | None) -> str:
+    code = twmarket.code_of(sym)
+    lines = []
+    if is_live(as_of):
+        n = twmarket.etf_nav_one(code)
+        if n:
+            prem = n.get("premium")
+            lines.append(f"- 市價 {n.get('price')}、預估淨值 {n.get('est_nav')}、前日淨值 {n.get('prior_nav')}、折溢價 "
+                         + ("—" if prem is None else f"{prem:+.2f}%")
+                         + (f"、規模約 {n['scale'] / 1e8:,.0f} 億" if n.get("scale") else "")
+                         + (f"、單位數增減 {n['units_chg']:+,.0f}（正＝淨申購）" if n.get("units_chg") is not None else ""))
+        info = twmarket.etf_info(code)
+        meta = "、".join(f"{k} {info[k]}" for k in ("分類", "追蹤指數", "配息", "經理公司") if info.get(k))
+        if meta:
+            lines.append(f"- {meta}")
+        h = twmarket.etf_holdings(code)
+        if h.get("items"):
+            lines.append(f"- 成分股（{h.get('scope') or ''} {h.get('period') or ''}）：" + "、".join(
+                f"{x['name']} {x['pct']:.1f}%" for x in h["items"][:10]) + f"（合計 {h.get('total_pct')}%）")
+    divs = [d for d in twmarket.dividends(sym) if not as_of or d["date"] <= as_of]
+    if divs:
+        end = dt.date.fromisoformat(as_of) if as_of else dt.date.today()
+        y1 = [d for d in divs if dt.date.fromisoformat(d["date"]) > end - dt.timedelta(days=365)]
+        lines.append("- 配息（除息日・每單位）：" + "、".join(f"{d['date']} {d['amount']:g}" for d in divs[:6])
+                     + f"；近一年合計 {sum(d['amount'] for d in y1):g}（{len(y1)} 次）")
+    return ("【ETF 資料】\n" + "\n".join(lines)) if lines else ""
+
+
+def valuation_section(sym: str, code: str, as_of: str | None) -> str:
+    from .research import store
+    d = as_of or _today()
+    lines = []
+    with store.conn() as c:
+        va = c.execute("SELECT date, pe, dy, pb FROM valuation WHERE code=? AND date<=? ORDER BY date DESC LIMIT 260",
+                       (code, d)).fetchall()
+        inc = c.execute("SELECT period, revenue, gross, op_income, net_parent, eps FROM income_ytd WHERE code=? AND avail<=? "
+                        "ORDER BY period DESC LIMIT 5", (code, d)).fetchall()
+    if va:
+        dd, pe, dy, pb = va[0]
+
+        def pctile(i, v):
+            xs = [r[i] for r in va if r[i] is not None]
+            return f"（近一年第 {sum(1 for x in xs if x <= v) / len(xs) * 100:.0f} 百分位）" if v is not None and len(xs) > 20 else ""
+        lines.append(f"- 證交所估值（{dd}）：本益比 {pe if pe is not None else '—'}{pctile(1, pe)}、殖利率 {dy if dy is not None else '—'}%"
+                     f"、股價淨值比 {pb if pb is not None else '—'}{pctile(3, pb)}")
+    if inc:
+        def m(a, b):
+            return f"{a / b * 100:.1f}%" if a is not None and b else "—"
+        lines.append("- 季財報（累計，已公布）：" + "；".join(
+            f"{p} 營收 {(r or 0) / 1e5:,.0f} 億、毛利率 {m(g, r)}、營益率 {m(o, r)}、EPS {e if e is not None else '—'}"
+            for p, r, g, o, n, e in inc[:4]))
+    divs = [x for x in twmarket.dividends(sym) if x["date"] <= d]
+    if divs:
+        lines.append("- 除權息（除息日・每股現金）：" + "、".join(f"{x['date']} {x['amount']:g}" for x in divs[:4]))
+    return ("【官方估值與財報】\n" + "\n".join(lines)) if lines else ""
+
+
+def fomc_section(as_of: str | None) -> str:
+    from . import fomc
+    d = as_of or _today()
+    day = max((m for m in fomc.meetings() if m <= d), default=None)
+    if not day:
+        return ""
+    b = fomc.bundle(day)
+    lines = [f"【最近一次 FOMC（{day}）】"]
+    if b.get("statement"):
+        ch = [("刪除：" if x["op"] == "del" else "新增：") + x["text"] for x in b.get("diff") or [] if x["op"] != "same"]
+        lines.append(f"聲明相對 {b.get('previous_date') or '上次'} 的措辭變化（{len(ch)} 處）：")
+        lines += [f"- {x[:220]}" for x in ch[:8]] or ["- 無變化"]
+        n = (b.get("notes") or {}).get("statement")
+        if n and is_live(as_of):
+            lines.append("AI 解讀（事後撰寫）：" + n["text"][:500])
+    sep = b.get("sep") or (fomc.latest_sep() if is_live(as_of) else None)
+    if sep and sep.get("date", day) <= d:
+        vals = []
+        for _lab, k, zh in fomc.VARS:
+            if k in sep.get("median", {}):
+                vals.append(f"{zh} " + "／".join("—" if x is None else f"{x:g}" for x in sep["median"][k]))
+        lines.append(f"經濟預測中位數（SEP {sep.get('date', day)}，{'、'.join(sep.get('years', []))}）：" + "；".join(vals))
+    mins = b.get("minutes")
+    due = b.get("minutes_due") or ""
+    if mins and (is_live(as_of) or (due and due <= d)):
+        n = (b.get("notes") or {}).get("minutes")
+        lines.append("會議紀要" + (f" AI 摘要：{n['text'][:500]}" if n else "已發布"))
+    return "\n".join(lines) if len(lines) > 1 else ""
+
+
+def others_section(sym: str, as_of: str | None, exclude_engine: str = "", days: int = 30) -> str:
+    from . import ledger
+    d = as_of or _today()
+    since = (dt.date.fromisoformat(d) - dt.timedelta(days=days)).isoformat()
+    rows = [r for r in ledger.records(ticker=sym, limit=60)
+            if r.get("ticker") == sym and r.get("date") and since <= r["date"] <= d and r.get("engine") != exclude_engine]
+    if not rows:
+        return ""
+    lines = []
+    for r in rows[:8]:
+        res = ""
+        if is_live(as_of):  # outcomes are known only after the fact → never in a backtest
+            c = (r.get("checks") or {}).get("5") or (r.get("checks") or {}).get("20")
+            if c and c.get("ret") is not None:
+                res = f"（事後 {c.get('h')} 日報酬 {c['ret']:+.1f}%）"
+        lines.append(f"- {r['date']} {r.get('engine_name') or r['engine']}：{r.get('signal') or '—'}"
+                     + (f"｜{(r.get('summary') or '')[:120]}" if r.get("summary") else "") + res)
+    return f"【其他 AI 近 {days} 天對這檔的結論】\n" + "\n".join(lines)
+
+
+def supply_section(sym: str) -> str:
+    from . import supplychain
+    nodes = supplychain.node_index().get(sym) or []
+    if not nodes:
+        return ""
+    lines = []
+    for nid in nodes[:2]:
+        det = supplychain.node_detail(nid)
+        ids = [nid] + [x["id"] for x in det["upstream"]] + [x["id"] for x in det["downstream"]]
+        st = supplychain.stats(ids)["nodes"]
+
+        def p(k):
+            v = st.get(k, {}).get("pct")
+            return "—" if v is None else f"{v:+.2f}%"
+        lines.append(f"- 環節「{det['name']}」今日平均 {p(nid)}"
+                     + ("；上游 " + "、".join(f"{x['name']} {p(x['id'])}" for x in det["upstream"][:5]) if det["upstream"] else "")
+                     + ("；下游 " + "、".join(f"{x['name']} {p(x['id'])}" for x in det["downstream"][:5]) if det["downstream"] else ""))
+        peers = [c for c in st.get(nid, {}).get("companies", []) if c["symbol"] != sym and c.get("pct") is not None][:6]
+        if peers:
+            lines.append("  同環節：" + "、".join(f"{c['name']} {c['pct']:+.2f}%" for c in peers))
+    return ("【供應鏈上下游（今日）】\n" + "\n".join(lines)) if lines else ""
+
+
+def world_section(sym: str, as_of: str | None) -> str:
+    from . import world
+    return world.compact(world.regions_for(sym), as_of)
+
+
+def news_us_section(sym: str) -> str:
+    items = market.news(sym, 10)
+    if not items:
+        return ""
+    return "【英文新聞】\n" + "\n".join(f"- {str(x.get('time') or '')[:10]} {x.get('title')}" for x in items[:10] if x.get("title"))
+
+
 # ------------------------------------------------------------------ assemble
-def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_chars: int = MAX_CHARS) -> dict:
-    """→ {"text": 中文段落, "parts": [已帶入的段落名], "skipped": {段落: 原因}, "as_of": 日期}."""
+def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_chars: int = MAX_CHARS,
+          exclude: set | frozenset = frozenset(), engine: str = "") -> dict:
+    """→ {"text": 中文段落, "parts": [已帶入的段落名], "skipped": {段落: 原因}, "as_of": 日期}.
+    exclude: 段落名（引擎自己已經有的，例如 TradingAgents 的世界訊號、FinGPT 的新聞）。"""
     if as_of in ("", "today"):
         as_of = None
     live = is_live(as_of)
     tw = twmarket.is_tw(sym)
     code = twmarket.code_of(sym) if tw else None
-    is_stock = not sym.startswith("^") and "=" not in sym and not sym.endswith("-USD")
+    is_sec = not sym.startswith("^") and "=" not in sym and not sym.endswith("-USD")
+    is_etf = tw and (twmarket.lookup(sym) or {}).get("kind") == "ETF"
     plan = []
-    if tw and is_stock:
-        plan += [("news", lambda: news_section(sym, as_of)), ("flows", lambda: flows_section(code, as_of)),
-                 ("revenue", lambda: revenue_section(code, as_of))]
-    if live and is_stock:
-        plan.append(("sector", lambda: sector_section(sym)))
+    if tw and is_sec:
+        plan += [("news", lambda: news_section(sym, as_of)), ("flows", lambda: flows_section(code, as_of))]
+        if is_etf:
+            plan.append(("etf", lambda: etf_section(sym, as_of)))
+        else:
+            plan += [("revenue", lambda: revenue_section(code, as_of)), ("valuation", lambda: valuation_section(sym, code, as_of))]
+    if not tw and is_sec and live:
+        plan.append(("news_us", lambda: news_us_section(sym)))
+    if live and is_sec:
+        plan += [("sector", lambda: sector_section(sym)), ("supply", lambda: supply_section(sym))]
+    if is_sec:
+        plan.append(("others", lambda: others_section(sym, as_of, engine)))
     if market_parts:
         if tw:
-            plan.append(("tw_macro", lambda: tw_macro_section(as_of)))
-        plan += [("us_macro", lambda: us_macro_section(as_of)), ("events", lambda: events_section(as_of))]
-    if not tw and is_stock and live:
+            plan += [("tw_macro", lambda: tw_macro_section(as_of)), ("fx", lambda: fx_section(as_of))]
+        plan += [("us_macro", lambda: us_macro_section(as_of)), ("fomc", lambda: fomc_section(as_of)),
+                 ("events", lambda: events_section(as_of))]
+    if is_sec:
+        plan.append(("world", lambda: world_section(sym, as_of)))
+    if not tw and is_sec and live:
         plan.append(("sec", lambda: sec_section(sym)))
     texts, parts, skipped = [], [], {}
     for key, fn in plan:
+        if key in exclude:
+            continue
         try:
             t = fn()
         except Exception as e:  # noqa: BLE001
@@ -238,7 +427,7 @@ def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_
         else:
             skipped[key] = "沒有資料"
     if not live:
-        skipped.setdefault("sector", "回測日不放當日產業強弱")
+        skipped.setdefault("sector", "回測日不放當日產業強弱與供應鏈")
     head = (f"【FT 市場背景】標的 {sym}，資料截至 {as_of or _today()}（只含當時已公布的資訊）。"
             "以下是終端機另外整理的台灣／美國市場資料，請一併納入判斷，並在報告中引用用到的數字；資料沒有的不要編造。")
     body = "\n\n".join(texts)
@@ -247,24 +436,28 @@ def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_
     return {"text": (head + "\n\n" + body) if texts else "", "parts": parts, "skipped": skipped, "as_of": as_of or _today()}
 
 
-def build_many(syms: list[str], as_of: str | None = None, per_chars: int = 2500) -> dict:
+def build_many(syms: list[str], as_of: str | None = None, per_chars: int = 2500, exclude: set | frozenset = frozenset(),
+               engine: str = "") -> dict:
     """For multi-ticker engines: market-level text once + a short per-ticker text."""
-    mk = build_market(as_of, any(twmarket.is_tw(s) for s in syms))
+    mk = build_market(as_of, any(twmarket.is_tw(s) for s in syms), exclude)
     per, parts = {}, set(mk["parts"])
     for s in syms[:8]:
-        b = build(s, as_of, market_parts=False, max_chars=per_chars)
+        b = build(s, as_of, market_parts=False, max_chars=per_chars, exclude=exclude, engine=engine)
         if b["text"]:
             per[s] = b["text"]
             parts |= set(b["parts"])
     return {"text": mk["text"], "by_symbol": per, "parts": sorted(parts), "as_of": mk["as_of"]}
 
 
-def build_market(as_of: str | None = None, tw: bool = True) -> dict:
+def build_market(as_of: str | None = None, tw: bool = True, exclude: set | frozenset = frozenset()) -> dict:
     if as_of in ("", "today"):
         as_of = None
     texts, parts = [], []
-    for key, fn in ((("tw_macro", lambda: tw_macro_section(as_of)),) if tw else ()) + (
-            ("us_macro", lambda: us_macro_section(as_of)), ("events", lambda: events_section(as_of))):
+    plan = ((("tw_macro", lambda: tw_macro_section(as_of)), ("fx", lambda: fx_section(as_of))) if tw else ()) + (
+        ("us_macro", lambda: us_macro_section(as_of)), ("fomc", lambda: fomc_section(as_of)), ("events", lambda: events_section(as_of)))
+    for key, fn in plan:
+        if key in exclude:
+            continue
         try:
             t = fn()
         except Exception:  # noqa: BLE001
@@ -356,4 +549,58 @@ def facts_en(sym: str, as_of: str | None = None) -> dict[str, str]:
             out["upcoming_events"] = "; ".join(up[:4])
     except Exception:  # noqa: BLE001
         pass
+    if tw:
+        try:
+            from . import fx
+            s = fx.series("USD", "2y")
+            v, tt = _at(s, as_of)
+            p = _ago(s[s.index <= tt], tt, 30) if v else None
+            if v and p:
+                out["taiwan_dollar"] = (f"USD/TWD {v:.2f}, {'TWD weakened' if v > p else 'TWD strengthened'} "
+                                        f"{abs(v / p - 1) * 100:.1f}% over the past month")
+        except Exception:  # noqa: BLE001
+            pass
+        if (twmarket.lookup(sym) or {}).get("kind") == "ETF" and is_live(as_of):
+            try:
+                n = twmarket.etf_nav_one(code)
+                if n and n.get("premium") is not None:
+                    out["etf_premium"] = f"trading at a {abs(n['premium']):.2f}% {'premium' if n['premium'] >= 0 else 'discount'} to estimated NAV"
+            except Exception:  # noqa: BLE001
+                pass
+        elif code:
+            try:
+                from .research import store
+                with store.conn() as c:
+                    va = c.execute("SELECT pe, dy, pb FROM valuation WHERE code=? AND date<=? ORDER BY date DESC LIMIT 260",
+                                   (code, as_of or _today())).fetchall()
+                pes = [r[0] for r in va if r[0]]
+                if va and va[0][0]:
+                    rank = sum(1 for x in pes if x <= va[0][0]) / len(pes) * 100
+                    out["valuation_tw"] = (f"P/E {va[0][0]:.1f} ({rank:.0f}th percentile of the past year), "
+                                           f"dividend yield {va[0][1] or 0:.1f}%, P/B {va[0][2] or 0:.1f}")
+            except Exception:  # noqa: BLE001
+                pass
     return {k: v for k, v in out.items() if v and not (isinstance(v, float) and math.isnan(v))}
+
+
+def tw_headlines_en(sym: str, n: int = 8) -> list[str]:
+    """Today's Chinese headlines translated to English by local Ollama (Laya reads English only). Cached 3 h."""
+    if not twmarket.is_tw(sym):
+        return []
+
+    def load():
+        import json as _json
+
+        from . import ollama
+        items = twmarket.news_zh(twmarket.news_query_for(sym), n, days=7)
+        if not items:
+            return []
+        src = "\n".join(f"{i + 1}. {x['title']}" for i, x in enumerate(items[:n]))
+        raw = ollama.ask(ollama.resolve(None), "Translate each Traditional Chinese financial news headline into concise English. "
+                         "Return JSON only: {\"headlines\": [\"...\"]} in the same order. Do not add information.", src, json_mode=True)
+        j = _json.loads(raw[raw.find("{"): raw.rfind("}") + 1])
+        return [str(x)[:200] for x in j.get("headlines", [])][:n]
+    try:
+        return market.cached(f"brief:hl_en:{sym}", 3 * 3600, load)
+    except Exception:  # noqa: BLE001
+        return []

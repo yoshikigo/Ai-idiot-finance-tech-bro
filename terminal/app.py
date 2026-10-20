@@ -527,6 +527,19 @@ async def api_ask(req: Request):
                     + (f"：{e['summary_final'][:160]}" if e["summary_final"] else "") for e in evs))
         except Exception:  # noqa: BLE001
             pass
+    if targets and targets[0] and not targets[0].startswith(context.FUND_PREFIX):
+        try:  # 基本背景一律帶上（不必等問題裡出現「總經」「匯率」這些字）；已經因關鍵字帶入的段落不重複
+            joined = "\n".join(parts)
+            have = {"news", "news_us", "flows", "revenue", "sec"}
+            for key, mark in (("us_macro", "【美國總經"), ("tw_macro", "【台灣總經"), ("fx", "【新台幣匯率"), ("fomc", "【FOMC"),
+                              ("sector", "產業分布】"), ("events", "重大事件"), ("world", "世界"), ("etf", "ETF")):
+                if mark in joined:
+                    have.add(key)
+            b = await run_in_threadpool(lambda: brief.build(targets[0], None, max_chars=3500, exclude=frozenset(have)))
+            if b["text"]:
+                parts.append(b["text"])
+        except Exception:  # noqa: BLE001
+            pass
     ctx_text = "\n\n".join(parts)
     system = ("你是專業金融終端機裡的市場分析師。回答精確、簡潔，引用下方提供的數字；資料缺漏要明講，絕不編造價格或淨值。"
               "台股漲跌以紅漲綠跌的習慣描述即可，金額單位用元、億元。不構成投資建議。"
@@ -567,6 +580,10 @@ def _eng(name: str) -> str:
 
 
 CTX_ENGINES = ("tradingagents", "hedgefund", "fingpt", "qlib", "finrl", "timesfm")
+# what each engine already reads by itself → not repeated in its FT 市場背景
+CTX_EXCLUDE = {"tradingagents": frozenset({"world", "news_us"}), "fingpt": frozenset({"news", "news_us"}),
+               "timesfm": frozenset({"world"}), "qlib": frozenset({"news", "news_us", "world"}),
+               "finrl": frozenset({"news", "news_us", "world"})}
 
 
 def _job_symbols(name: str, p: dict) -> list[str]:
@@ -595,16 +612,17 @@ def enrich_job(name: str, body: dict) -> dict:
     p = body.get("params") or {}
     if name in CTX_ENGINES and str(p.get("ft_context", True)).lower() not in ("false", "0", "no", "off"):
         date = p.get("date") if p.get("date") not in (None, "", "today") else None
+        ex = CTX_EXCLUDE.get(name, frozenset())
         try:
             syms = _job_symbols(name, p)
             if name in ("tradingagents", "fingpt", "timesfm") and syms:
-                b = brief.build(syms[0], date)
+                b = brief.build(syms[0], date, exclude=ex, engine=name)
                 body["llm"]["context"] = b["text"]
             elif syms:
-                b = brief.build_many(syms, date)
+                b = brief.build_many(syms, date, per_chars=1500 if name in ("qlib", "finrl") else 2500, exclude=ex, engine=name)
                 body["llm"].update(context=b["text"], context_by=b["by_symbol"])
             else:
-                b = brief.build_market(date, True)
+                b = brief.build_market(date, True, ex)
                 body["llm"]["context"] = b["text"]
             body["llm"]["context_parts"] = brief.describe(b["parts"])
         except Exception as e:  # noqa: BLE001  never block an analysis on the extras

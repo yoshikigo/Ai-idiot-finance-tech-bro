@@ -315,6 +315,12 @@ def build_state(sym: str, as_of: str, h: int, use_agents=True, use_timesfm=True,
         facts["world"] = wl
     if use_news and as_of == today():
         hl = headlines(sym)
+        if use_ft and twmarket.is_tw(sym):  # Taiwan news is Chinese: translated by local Ollama so Laya can read it
+            try:
+                from ft_common import brief
+                hl = (hl or []) + brief.tw_headlines_en(sym)
+            except Exception:  # noqa: BLE001
+                pass
         if hl:
             st["recent_headlines"] = hl
             facts["news"] = hl
