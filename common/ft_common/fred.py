@@ -41,8 +41,24 @@ SERIES = {
     "DTWEXBGS": ("美元指數（廣義）", "", "level", "金融情勢", ""),
     "M2SL": ("M2 年增率", "%", "yoy", "金融情勢", "貨幣供給"),
     "DCOILWTICO": ("WTI 原油", "美元", "level", "商品", ""),
+    "NETLIQ": ("Fed 淨流動性", "十億美元", "level", "流動性",
+               "Fed 資產負債表 − 財政部 TGA − 隔夜逆回購；上升＝市場資金變多，常與美股同向"),
+    "WALCL": ("Fed 資產負債表", "十億美元", "level", "流動性", "總資產（每週三）；擴表＝QE、縮表＝QT"),
+    "WTREGEN": ("財政部 TGA 帳戶", "十億美元", "level", "流動性", "財政部在 Fed 的存款；上升＝從市場抽走資金"),
+    "RRPONTSYD": ("隔夜逆回購（RRP）", "十億美元", "level", "流動性", "停在 Fed 的閒置資金；下降＝資金回到市場"),
 }
-GROUPS = ["利率", "通膨", "就業", "景氣", "金融情勢", "商品"]
+GROUPS = ["流動性", "利率", "通膨", "就業", "景氣", "金融情勢", "商品"]
+LIQUIDITY = ["NETLIQ", "WALCL", "WTREGEN", "RRPONTSYD"]
+SCALE = {"WALCL": 1 / 1000}  # millions → billions (TGA and RRP are already in billions)
+
+
+def net_liquidity() -> pd.Series:
+    """Weekly (Wednesday, the H.4.1 date): WALCL − TGA − RRP, in billions of USD."""
+    bs = raw("WALCL") * SCALE["WALCL"]
+    tga, rrp = raw("WTREGEN"), raw("RRPONTSYD")
+    idx = bs.index[bs.index >= max(tga.index.min(), rrp.index.min())]
+    asof = lambda s: s.reindex(s.index.union(idx)).ffill().reindex(idx)  # noqa: E731
+    return (bs.reindex(idx) - asof(tga) - asof(rrp)).dropna()
 
 
 API_URL = "https://api.stlouisfed.org/fred/series/observations"
@@ -52,10 +68,13 @@ _csv_down = {"until": 0.0, "why": ""}  # after a failure skip fredgraph.csv for 
 
 
 def raw(series_id: str) -> pd.Series:
-    """History since 1990 as a float Series indexed by date (cached 6 h).
+    """History since 1990 as a float Series indexed by date (cached 6 h). "NETLIQ" is derived (net_liquidity).
 
     fredgraph.csv (no key) first; when it fails and FT_FRED_API_KEY is set (free key from
     https://fredaccount.stlouisfed.org/apikeys), the official API. Errors name both attempts."""
+    if series_id == "NETLIQ":
+        return market.cached("fred:NETLIQ", 6 * 3600, net_liquidity)
+
     def load():
         if market.FAKE:
             return _fake(series_id)
@@ -128,7 +147,7 @@ def parse_csv(text: str) -> pd.Series:
 
 
 def transformed(series_id: str) -> pd.Series:
-    s = raw(series_id)
+    s = raw(series_id) * SCALE.get(series_id, 1)
     how = SERIES.get(series_id, ("", "", "level"))[2]
     if how == "yoy":
         gap = pd.Series(s.index[-30:]).diff().dt.days.median() if len(s) > 2 else 30
@@ -219,10 +238,46 @@ def _fake(sid: str) -> pd.Series:
         "CPIAUCSL", "CPILFESL", "PCEPILFE", "UNRATE", "PAYEMS", "UMCSENT", "RECPROUSM156N", "M2SL") else "W")
     base = {"DFEDTARU": 4.5, "DFEDTARL": 4.25, "DFF": 4.3, "DGS2": 3.8, "DGS10": 4.2, "T10Y2Y": 0.4, "T10Y3M": 0.1,
             "CPIAUCSL": 300, "CPILFESL": 310, "PCEPILFE": 120, "UNRATE": 4.1, "PAYEMS": 158000, "ICSA": 220000,
-            "M2SL": 21000, "VIXCLS": 17, "BAMLH0A0HYM2": 3.2}.get(sid, 100)
+            "M2SL": 21000, "VIXCLS": 17, "BAMLH0A0HYM2": 3.2, "WALCL": 6.6e6, "WTREGEN": 800, "RRPONTSYD": 150,
+            "DFEDTARL": 4.25}.get(sid, 100)
     if sid in ("DFEDTARU", "DFEDTARL"):
         steps = np.cumsum(rng.choice([0, 0, 0, 0.25, -0.25], len(idx)))
         return pd.Series(np.clip(base + steps * 0.2, 0.25, 6), index=idx).round(2)
     drift = 0.002 if sid in ("CPIAUCSL", "CPILFESL", "PCEPILFE", "M2SL", "PAYEMS") else 0
     vals = base * np.cumprod(1 + drift + rng.normal(0, 0.01, len(idx)))
     return pd.Series(vals, index=idx)
+
+
+def liquidity_text() -> str:
+    """Net liquidity level, 4/13/52-week changes, and how its 13-week change has tracked the S&P 500 (2 years)."""
+    nl = transformed("NETLIQ")
+    if not len(nl):
+        return "【Fed 淨流動性】沒有資料"
+    last = float(nl.iloc[-1])
+
+    def chg(weeks):
+        p = nl[nl.index <= nl.index[-1] - pd.Timedelta(weeks=weeks)]
+        return last - float(p.iloc[-1]) if len(p) else None
+    parts = [f"{label} {v:+,.0f}" for label, v in (("4 週", chg(4)), ("13 週", chg(13)), ("52 週", chg(52))) if v is not None]
+    comp = []
+    for sid in ("WALCL", "WTREGEN", "RRPONTSYD"):
+        try:
+            x = transformed(sid)
+            comp.append(f"{SERIES[sid][0]} {float(x.iloc[-1]):,.0f}")
+        except Exception:  # noqa: BLE001
+            pass
+    corr = None
+    try:
+        spx = market.history("^GSPC", "2y", "1d")["Close"].astype(float)
+        spx.index = pd.DatetimeIndex(spx.index).tz_localize(None).normalize()
+        w = nl[nl.index >= nl.index[-1] - pd.Timedelta(days=730)]
+        sp = spx.reindex(spx.index.union(w.index)).ffill().reindex(w.index)
+        a, b = w.diff(13).dropna(), sp.pct_change(13).dropna()
+        j = a.index.intersection(b.index)
+        if len(j) > 20:
+            corr = float(a[j].corr(b[j]))
+    except Exception:  # noqa: BLE001
+        pass
+    return (f"【Fed 淨流動性（FRED，{nl.index[-1]:%Y-%m-%d}）】{last:,.0f} 十億美元（{'、'.join(parts)}）；"
+            f"組成：{'、'.join(comp)}（淨流動性＝資產負債表 − TGA − 逆回購）"
+            + (f"；近兩年 13 週變化與 S&P 500 13 週報酬的相關係數 {corr:+.2f}" if corr is not None else ""))

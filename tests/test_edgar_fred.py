@@ -157,3 +157,21 @@ def test_fred_falls_back_to_api_key_and_explains_failures(monkeypatch):
     monkeypatch.setenv("FT_FRED_API_KEY", "k")
     s = fred.raw("ZZTEST2")
     assert list(s.values) == [4.01, 4.05] and calls[-1][1]["api_key"] == "k"
+
+
+def test_net_liquidity(monkeypatch):
+    from ft_common import fred, market
+    monkeypatch.setattr(market, "FAKE", False)
+    wk = pd.date_range("2026-01-07", periods=20, freq="W-WED")
+    dly = pd.date_range("2026-01-01", "2026-05-25", freq="D")
+    data = {"WALCL": pd.Series(6_600_000.0, index=wk), "WTREGEN": pd.Series(800.0, index=wk),
+            "RRPONTSYD": pd.Series(150.0, index=dly)}
+    data["WALCL"].iloc[-1] = 6_700_000.0
+    monkeypatch.setattr(fred, "raw", lambda sid: fred.net_liquidity() if sid == "NETLIQ" else data[sid])
+    nl = fred.net_liquidity()
+    assert nl.iloc[0] == pytest.approx(6600 - 800 - 150) and nl.iloc[-1] == pytest.approx(6700 - 800 - 150)
+    assert fred.transformed("WALCL").iloc[-1] == pytest.approx(6700)  # millions → billions
+    spx = pd.DataFrame({"Close": [5000.0 + k for k in range(200)]}, index=pd.bdate_range("2025-11-01", periods=200))
+    monkeypatch.setattr(market, "history", lambda *a, **k: spx)
+    t = fred.liquidity_text()
+    assert "5,750" in t and "13 週" in t and "Fed 資產負債表 6,700" in t

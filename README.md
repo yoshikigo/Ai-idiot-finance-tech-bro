@@ -14,6 +14,10 @@
 - **Qlib** 多一個股票池「台股熱門 ETF 輪動（含債券 ETF）」；選股排名附中文名稱。**FinGPT** 對台股改用中文新聞。
 - **Hermes skill `fin-terminal`** 與 **Open WebUI Tool**，共用新的 `/api/agent/*`。
 
+## 💧 Fed 淨流動性（2026.10.19-31 新增）
+
+「總經」頁多了「流動性」一組：**Fed 淨流動性**＝Fed 資產負債表（WALCL）− 財政部 TGA 帳戶（WTREGEN）− 隔夜逆回購（RRPONTSYD），單位十億美元、每週三更新，三個組成也各列一行。點淨流動性那一列，走勢圖預設疊上 S&P 500（左軸，可用「疊 S&P 500」開關，其他指標也能疊）。ASK 問到流動性／資金面／逆回購／TGA／縮表時自動帶入最新值、4／13／52 週變化與近兩年和 S&P 500 的相關係數。Hermes `ft.py liquidity`、Open WebUI `fed_net_liquidity`、agent `/api/agent/liquidity`；`ft.py macro`／`us_macro` 也會包含這一組。資料全部來自 FRED，不用金鑰。
+
 ## 🏛 Fed 文件與美國數據公布日（2026.10.19-30 新增）
 
 **FOMC 文件**：「大事」頁每個 Fed 事件多了「📄 聲明／紀要／預測」——
@@ -390,6 +394,7 @@ tar xzf fin-terminal.tar.gz && cd fin-terminal
 - ✅ 台股資料層 9 個離線測試：ISIN 清單（保留股票、ETF，略過權證；Big5 解碼）、MIS（上市／上櫃／指數、無成交試算價、空殼列）、`all_etf.txt`（數字／字串混合、「未結出」）、ETF 分類與排序、投信投顧公會月份選單與表格（合計列、改版偵測）、**成分股 postback 流程**（VIEWSTATE 串接、依類別查、去掉警語與級別比對基金名）、三種基金 CSV（BOM、千分位、民國年、壞資料）、SQLite 累積與報酬計算、Google 新聞 RSS。SITCA fixture 格式沿用 TWSEMCPServer 的測試（那個專案有對真實網站的 e2e 測試）。
 - ✅ 用假資料＋假 Ollama 跑過：UI（Chromium 截圖：中文指令、ETF 總覽、ETF 資料頁、基金搜尋→走勢、紅漲綠跌、手機版）、agent API 全部端點、Hermes `ft.py` 全部指令（含 analyze → DONE／PENDING、引擎離線訊息、參數型別轉換）、Open WebUI Tool 10 個方法（含進度事件）、ASK 自動帶入問題中的標的。
 - ✅ TimesFM：用 timesfm 3.0.2 的真實程式碼（2.5 與 3.0 兩條路徑）以隨機權重在 CPU 跑過預測、回測、基金淨值、同步 API、側欄報告、走勢圖與基金圖的疊圖、Hermes `forecast`、agent API；lock 檔在乾淨環境可安裝。⚠️ 我這邊連不到 Hugging Face，**真實權重的下載與預測品質要在你那邊看**（smoke.sh 會跑一次 0050）。
+- ✅ 2026.10.19-31：Fed 淨流動性 1 個測試（單位換算、週三對齊逆回購日資料、文字含變化與組成）；Chromium 截圖檢查走勢疊 S&P 500。
 - ✅ 2026.10.19-30：FOMC 文件與美國數據公布日 3 個測試（SEP 表格解析含註腳與前次列、聲明去除頁尾、逐句差異、API、AI 解讀只問一次、紀要未發布、CPI／非農／PCE 事件與停擺改期、長圖不顯示、agent fomc／calendar）；分析工具箱的測試一併通過；Chromium 截圖檢查 Fed 事件展開、美國數據篩選與總經頁 SEP。⚠️ federalreserve.gov 的實際頁面結構要你那邊跑一次確認。
 - ✅ 2026.10.19-29：定期定額 4 個測試（排程含月底與每週、假日順延、手續費最低 1 元、外幣換算、XIRR、單筆比較、持股計畫的新增／修改／刪除與權限、回測 API、AI 評估只收回測文字、agent）；Chromium 截圖檢查持股頁定期定額與側欄回測圖。⚠️ 真實價格要你那邊確認。
 - ✅ 2026.10.19-28：歷史大事 24 → 38 件（補 2021–2026，2025/5 之後的事件日期與數字已對照新聞查證）。

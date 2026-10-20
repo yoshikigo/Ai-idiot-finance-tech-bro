@@ -246,6 +246,12 @@ def kit_text(kind: str, q: str = "", expiry: str = "", market: str = "all", plai
         return _out(f"{sym or kind}：{e}", plain, None, format)
 
 
+@router.get("/liquidity")
+def liquidity_text(plain: bool = False, format: str = "text"):  # noqa: A002
+    """Fed 淨流動性（資產負債表 − 財政部 TGA − 隔夜逆回購）：最新值、4／13／52 週變化、組成、與 S&P 500 的相關。"""
+    return _out(fred.liquidity_text(), plain, None, format)
+
+
 @router.get("/fomc")
 def fomc_text(date: str = "", plain: bool = False, format: str = "text"):  # noqa: A002
     """FOMC 會議：聲明稿相對上次的措辭變化（逐句新增／刪除）、AI 解讀、經濟預測中位數（SEP，含前次比較）、會議紀要摘要。

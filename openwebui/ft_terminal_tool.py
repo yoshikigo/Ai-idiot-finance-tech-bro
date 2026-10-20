@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.13.0
+version: 0.14.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -252,6 +252,16 @@ class Tools:
         """
         await self._status(__event_emitter__, "市場情報")
         out = await self._get("kit/intel", {"market": market}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def fed_net_liquidity(self, __event_emitter__: Emitter = None) -> str:
+        """
+        Fed 淨流動性＝Fed 資產負債表 − 財政部 TGA 帳戶 − 隔夜逆回購（FRED，每週）：最新值、4／13／52 週變化、各組成、近兩年與 S&P 500 的相關係數。
+        :return: 一段文字
+        """
+        await self._status(__event_emitter__, "Fed 淨流動性")
+        out = await self._get("liquidity", {}, timeout=120)
         await self._status(__event_emitter__, "完成", True)
         return out
 

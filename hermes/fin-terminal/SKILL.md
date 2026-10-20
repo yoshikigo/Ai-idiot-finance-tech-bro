@@ -29,6 +29,7 @@ python3 /opt/data/skills/fin-terminal/scripts/ft.py <指令> [參數]
 | 「AAPL 財報會不會優於預期」「上次財報後漲跌多少」「台積電月營收」 | `ft.py earnings AAPL` |
 | 「KO 便宜嗎」「Graham／葛拉漢」「F-score」「護城河」 | `ft.py value KO` |
 | 「最近哪些類股強」「類股輪動」「市場廣度」「今天台股權值誰最強」 | `ft.py intel --market tw`（tw／us／all） |
+| 「市場資金面怎樣」「Fed 淨流動性」「逆回購／TGA」「縮表」 | `ft.py liquidity` |
 | 「Fed 這次聲明改了什麼」「點陣圖預期明年降幾次」「會議紀要重點」 | `ft.py fomc`（最近一次）或 `ft.py fomc 2026-09-16` |
 | 「這週有什麼重要數據」「CPI 什麼時候公布」「下次 Fed 開會是哪天」 | `ft.py calendar` 或 `ft.py calendar 30` |
 | 「每月定期定額 5000 買 0050 過去 5 年賺多少」「0050 和 VOO 定期定額哪個好」 | `ft.py dca 0050,VOO --amount 5000 --years 5`（對比單筆投入、年化、最大回撤；不會讀使用者的持股） |

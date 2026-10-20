@@ -468,6 +468,11 @@ async def api_ask(req: Request):
             parts.append(await run_in_threadpool(fx.text, None))
         except Exception:  # noqa: BLE001
             pass
+    if any(k in last_q for k in ("流動性", "資金面", "淨流動性", "逆回購", "TGA", "縮表", "QT", "QE", "資產負債表", "熱錢")):
+        try:
+            parts.append(await run_in_threadpool(fred.liquidity_text))
+        except Exception:  # noqa: BLE001
+            pass
     if any(k in last_q for k in ("Fed", "FOMC", "聯準會", "鮑爾", "點陣圖", "會議紀要", "利率決策")):
         try:
             parts.append(await run_in_threadpool(fomc.text, None))

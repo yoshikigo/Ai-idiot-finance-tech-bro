@@ -18,6 +18,7 @@
   ft.py value KO                            價值檢查：Graham 數、NCAV、Piotroski F-score、護城河指標
   ft.py intel [--market tw|us|all]          市場情報：美股類股輪動、台美權值股強弱、市場廣度
   ft.py dca 0050,VOO,BTC-USD [--amount 5000] [--years 5] [--days 6]   定期定額回測（對比單筆投入）
+  ft.py liquidity                            Fed 淨流動性（資產負債表 − TGA − 逆回購）與 S&P 500 相關
   ft.py fomc [YYYY-MM-DD]                    Fed 會議：聲明措辭變化、AI 解讀、經濟預測（SEP）、會議紀要
   ft.py calendar [天數]                      接下來的 Fed／台灣央行／美國 CPI、非農、PCE 公布日
   ft.py sec NVDA                            美股 SEC 最近申報與年度財報
@@ -112,6 +113,8 @@ def main():
         if c == "intel":
             params = {"market": a.market}
         out = call(f"kit/{c}", params, timeout=180)
+    elif c == "liquidity":
+        out = call("liquidity", timeout=120)
     elif c == "fomc":
         out = call("fomc", {"date": words}, timeout=180)
     elif c == "calendar":

@@ -3285,7 +3285,8 @@ async function renderMacro(i, body, p) {
 
 async function macroChart(i, box, id, p) {
   box.classList.remove("hidden");
-  const yrs = p.fredYears || 10;
+  const yrs = p.fredYears || (id === "NETLIQ" ? 5 : 10);
+  const spxOn = p.fredSpx === undefined || p.fredSpx === null ? id === "NETLIQ" : !!p.fredSpx;
   const bar = h("div", { class: "ranges" });
   const area = h("div", { class: "mc-area" });
   box.append(bar, area);
@@ -3295,6 +3296,7 @@ async function macroChart(i, box, id, p) {
     h("span", { class: "grow" }), ...[[2, "2 年"], [5, "5 年"], [10, "10 年"], [30, "30 年"], [300, "全部"]].map(([y, l]) =>
       h("button", { class: yrs === y ? "on" : "", onclick: () => setPane(i, { fredYears: y }) }, l)),
     h("button", { class: p.fredFed ? "on mev-btn" : "mev-btn", title: "標出 Fed 利率決策（升息／降息）", onclick: () => setPane(i, { fredFed: !p.fredFed }) }, "📌 Fed"),
+    h("button", { class: spxOn ? "on" : "", title: "在左軸疊上 S&P 500 對照", onclick: () => setPane(i, { fredSpx: !spxOn }) }, "疊 S&P 500"),
     h("button", { onclick: () => setPane(i, { fredId: "" }) }, "✕"));
   if (!d.points.length) { area.innerHTML = `<div class="empty">沒有資料</div>`; return; }
   requestAnimationFrame(async () => {
@@ -3302,6 +3304,16 @@ async function macroChart(i, box, id, p) {
     const s = chart.addLineSeries({ color: cssVar("--amber"), lineWidth: 2, priceFormat: { type: "price", precision: 2, minMove: 0.01 } });
     s.setData(d.points);
     if (["T10Y2Y", "T10Y3M"].includes(id) || d.how !== "level") s.createPriceLine({ price: 0, color: "#5b636b", lineWidth: 1, lineStyle: 2, axisLabelVisible: false });
+    if (spxOn) {
+      try {
+        const rng = yrs <= 2 ? "2y" : yrs <= 5 ? "5y" : yrs <= 10 ? "10y" : "max";
+        const spx = await api(`/api/history?s=%5EGSPC&range=${rng}`);
+        chart.applyOptions({ leftPriceScale: { visible: true, borderColor: "#2a2f35" } });
+        const l = chart.addLineSeries({ color: "#4ba3ff", lineWidth: 1, priceScaleId: "left", priceLineVisible: false, title: "S&P 500" });
+        const t0 = d.points[0].time;
+        l.setData(spx.filter((x) => x.time >= t0).map((x) => ({ time: x.time, value: x.close })));
+      } catch (e) {}
+    }
     chart.timeScale().fitContent();
     S.charts.set(i, { chart, fit: () => chart.timeScale().fitContent() });
     if (p.fredFed) {
