@@ -140,3 +140,53 @@ def test_history_folds_nearby_detection(ev, monkeypatch):
     assert h["moves"]["^TWII"]["pct"] == -7.0 and h["moves"]["^GSPC"]["pct"] == 9.5
     m = ev.markers("2026-01-01", None, "^TWII")
     assert any(x["kind"] == "history" and x["label"] for x in m)
+
+
+def test_geo_threads(ev, monkeypatch):
+    ev.refresh("2y")
+    us = ev.list_events("2025-01-01", "2027-02-01", ["uscn"], world_too=False)
+    ids = {e["id"] for e in us}
+    assert {"uscn:2026-09-23", "uscn:2027-01-10", "hist:2025-10-30", "hist:2025-05-12"} <= ids  # thread pulls in history
+    assert not any(e["kind"] == "drill" for e in us)
+    up = next(e for e in us if e["id"] == "uscn:2027-01-10")
+    assert up["upcoming"] and "休戰" in up["title_final"]
+    dr = ev.list_events("2026-01-01", "2026-12-31", ["drill"], world_too=False)
+    assert any("利劍" in e["title_final"] and "與那國" in e["summary_final"] for e in dr)
+    # curated text is resynced on refresh, a user edit still wins
+    ev.edit("drill:2026-10-19", title="我的標題")
+    ev.refresh("2y")
+    assert next(e for e in ev.list_events("2026-10-01", "2026-10-31", ["drill"], world_too=False))["title_final"] == "我的標題"
+    # headlines enrichment (no AI renaming for curated threads)
+    called = []
+    monkeypatch.setattr("ft_common.ollama.ask", lambda *a, **k: called.append(1) or '{"title":"x"}', raising=False)
+    e = ev.enrich("uscn:2026-09-24", {"model": "m"})
+    assert e["headlines"] and not called and e["auto_title"].startswith("習近平")
+    assert "uscn:2026-09-24" not in ev.pending() and "uscn:2027-01-10" not in ev.pending()
+    t = ev.geo_text(("uscn",))
+    assert "【中美談判】" in t and "2027-01-10（即將）" in t and "川習釜山會" in t and "軍演" not in t
+    mk = ev.markers("2026-01-01", "2026-12-31", "^TWII")
+    assert {"uscn", "drill"} <= {m["kind"] for m in mk}
+    assert not any(m["kind"] == "drill" for m in ev.markers("2020-01-01", "2026-12-31", "^TWII"))  # long chart
+
+
+def test_geo_agent(tmp_path, monkeypatch):
+    monkeypatch.setenv("FT_DATA", str(tmp_path))
+    from ft_common import events, market, twmarket
+    monkeypatch.setattr(market, "FAKE", True)
+    monkeypatch.setattr(twmarket, "FAKE", True)
+    monkeypatch.setattr(events, "load_closes", lambda period: {})
+    monkeypatch.setattr(events, "macro_actual", lambda k, ref: None)
+    from ft_common import fred
+    monkeypatch.setattr(fred, "fed_decision", lambda d: None)
+    events.refresh("2y")
+    sys.path.insert(0, str(ROOT / "terminal"))
+    import importlib
+
+    import app as appmod
+    importlib.reload(appmod)
+    from fastapi.testclient import TestClient
+    c = TestClient(appmod.app)
+    t = c.get("/api/agent/geo", params={"kind": "drill"}).text
+    assert "利劍" in t and "中美談判" not in t
+    assert "中美談判" in c.get("/api/agent/geo").text
+    assert "美中關稅休戰到期" in c.get("/api/agent/calendar", params={"days": 120}).text

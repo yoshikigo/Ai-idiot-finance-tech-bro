@@ -201,7 +201,7 @@ def major_events(days: int = 365, plain: bool = False, format: str = "text"):  #
     """近一年市場重大事件（指數大波動、Fed 決策、自訂），含 AI 摘要。"""
     import datetime as _dt
     since = (_dt.date.today() - _dt.timedelta(days=days)).isoformat()
-    rows = events.list_events(since, None, ["move", "history", "fomc", "manual"], world_too=False)
+    rows = events.list_events(since, None, ["move", "history", "fomc", "uscn", "drill", "manual"], world_too=False)
     lines = []
     for e in rows:
         mv = "、".join(f"{m['name']} {m['pct']:+.1f}%" for m in e["moves"].values())
@@ -209,6 +209,14 @@ def major_events(days: int = 365, plain: bool = False, format: str = "text"):  #
         lines.append(f"{e['date']} {e['title_final']}{tag}" + (f"｜{mv}" if mv else "")
                      + (f"\n  {e['summary_final']}" if e["summary_final"] else ""))
     return _out("【市場重大事件】\n" + "\n".join(lines or ["（還沒有偵測到事件）"]), plain, rows, format)
+
+
+@router.get("/geo")
+def geo_text(kind: str = "", plain: bool = False, format: str = "text"):  # noqa: A002
+    """中美談判（關稅休戰、川習會、經貿會談）與美軍和盟國聯合軍演的時間線：近一年＋接下來 4 個月，附當時新聞標題。
+    kind＝uscn（只看中美）或 drill（只看軍演），空白＝兩者。"""
+    kinds = tuple(k for k in kind.split(",") if k in events.GEO_KINDS) or events.GEO_KINDS
+    return _out(events.geo_text(kinds), plain, None, format)
 
 
 @router.get("/ledger")
@@ -275,7 +283,7 @@ def calendar_text(days: int = 21, plain: bool = False, format: str = "text"):  #
     import datetime as _dt
     t = _dt.date.today()
     rows = events.list_events(t.isoformat(), (t + _dt.timedelta(days=max(1, min(days, 120)))).isoformat(),
-                              ["fomc", "cbc", "macro"], world_too=False)
+                              ["fomc", "cbc", "macro", "uscn", "drill"], world_too=False)
     lines = [f"【接下來 {days} 天重要日程】"] + [f"- {e['date']} {e['title_final']}" for e in sorted(rows, key=lambda e: e["date"])]
     return _out("\n".join(lines) if rows else "接下來沒有排定的重要日程", plain, None, format)
 
@@ -601,7 +609,8 @@ HELP = """FT Terminal agent API（全部 GET，除了 analyze）
 /api/agent/twmacro                                台灣總經（景氣燈號、經濟成長率、CPI、失業率、重貼現率、M1B／M2）
 /api/agent/sec?q=NVDA                             美股 SEC 最近申報＋年度財報（需 FT_SEC_USER_AGENT）
 /api/agent/ledger                                 AI 分析紀錄：各 agent 5／20／60 日命中率、最近檢討與提醒
-/api/agent/events?days=365                        近一年市場重大事件（指數大波動、Fed 決策、自訂）＋AI 摘要
+/api/agent/events?days=365                        近一年市場重大事件（指數大波動、Fed 決策、中美談判、軍演、自訂）＋AI 摘要
+/api/agent/geo?kind=uscn|drill                    中美談判／美軍與盟國聯合軍演時間線（含接下來的日程）
 /api/agent/chain   /api/agent/chain?q=CoWoS        供應鏈：各環節今日漲跌／某環節（或某檔股票所在環節）的上下游與成分股
 /api/agent/world?q=2603  或 ?region=台灣,紅海      現實世界訊號（God's Eye View：地震、軍機、航運、氣旋）
 /api/agent/review                                 AI 預測回顧（過去的預測準不準）

@@ -416,6 +416,8 @@ async def api_translate(req: Request):
 
 
 # ------------------------------------------------------------------ ASK (streaming chat)
+USCN_WORDS = ("中美", "美中", "川習", "習川", "貿易戰", "關稅休戰", "休戰", "和談", "貿易協議", "何立峰", "貝森特", "APEC")
+DRILL_WORDS = ("軍演", "演習", "聯演", "利劍", "RIMPAC", "環太平洋", "與那國", "台海", "解放軍", "美軍")
 TW_MACRO_WORDS = ("台灣總經", "景氣燈號", "景氣對策", "對策信號", "藍燈", "紅燈", "黃紅燈", "黃藍燈", "重貼現率", "央行",
                   "M1B", "資金動能", "國發會", "主計", "台灣經濟", "台灣通膨", "台灣 GDP", "台灣GDP", "拆款")
 TW_MACRO_HINTS = ("總經", "經濟", "景氣", "通膨", "CPI", "物價", "失業", "GDP", "成長率", "利率", "升息", "降息", "M2", "資金")
@@ -469,6 +471,12 @@ async def api_ask(req: Request):
     if any(k in last_q for k in ("匯率", "台幣", "新台幣", "美元", "日圓", "日幣", "人民幣", "歐元", "韓元", "換匯", "升值", "貶值")):
         try:
             parts.append(await run_in_threadpool(fx.text, None))
+        except Exception:  # noqa: BLE001
+            pass
+    geo_k = tuple(k for k, words in (("uscn", USCN_WORDS), ("drill", DRILL_WORDS)) if any(w in last_q for w in words))
+    if geo_k:
+        try:
+            parts.append(await run_in_threadpool(events.geo_text, geo_k))
         except Exception:  # noqa: BLE001
             pass
     if any(k in last_q for k in TW_MACRO_WORDS) or (any(k in last_q for k in ("台灣", "台股", "國內", "我國"))

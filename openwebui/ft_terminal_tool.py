@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.15.0
+version: 0.16.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -252,6 +252,17 @@ class Tools:
         """
         await self._status(__event_emitter__, "市場情報")
         out = await self._get("kit/intel", {"market": market}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def geopolitics_timeline(self, kind: str = "", __event_emitter__: Emitter = None) -> str:
+        """
+        中美談判（關稅休戰與到期日、川習會、經貿會談）與美軍和盟國聯合軍演（利劍、RIMPAC 等）的時間線：近一年＋接下來 4 個月，附當時新聞標題。
+        :param kind: "uscn"＝只看中美談判、"drill"＝只看軍演、空白＝兩者
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, "中美談判／軍演")
+        out = await self._get("geo", {"kind": kind}, timeout=120)
         await self._status(__event_emitter__, "完成", True)
         return out
 

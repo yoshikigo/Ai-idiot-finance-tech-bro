@@ -934,6 +934,8 @@ async function overlayMajor(i, sec, rows) {
     if (e.kind === "move") mk.push({ time: t, position: e.dir > 0 ? "belowBar" : "aboveBar", color: e.dir > 0 ? UP : DN, shape: e.dir > 0 ? "arrowUp" : "arrowDown", text: short });
     else if (e.kind === "fomc") mk.push({ time: t, position: "belowBar", color: "#b48cff", shape: "square", text: "Fed" });
     else if (e.kind === "cbc") mk.push({ time: t, position: "belowBar", color: "#3ad6d6", shape: "square", text: "央行" });
+    else if (e.kind === "uscn") mk.push({ time: t, position: "aboveBar", color: "#7bd88f", shape: "circle", text: "中美" });
+    else if (e.kind === "drill") mk.push({ time: t, position: "aboveBar", color: "#ff6b6b", shape: "square", text: "軍演" });
     else if (e.kind === "macro") mk.push({ time: t, position: "belowBar", color: "#ff9f43", shape: "square", text: /CPI/.test(e.title) ? "CPI" : /非農/.test(e.title) ? "非農" : "PCE" });
     else if (e.kind === "history") mk.push({ time: t, position: e.dir > 0 ? "belowBar" : "aboveBar", color: "#e6e6e6", shape: "circle", text: short });
     else mk.push({ time: t, position: "aboveBar", color: "#ffd166", shape: "circle", text: short });
@@ -2906,7 +2908,7 @@ function holdPrompt(d) {
 
 
 /* ---------- 重大事件 */
-const EV_KIND_STYLE = { move: "ev-move", history: "ev-hist", fomc: "ev-fomc", cbc: "ev-cbc", macro: "ev-macro", manual: "ev-manual", world: "ev-world" };
+const EV_KIND_STYLE = { move: "ev-move", history: "ev-hist", fomc: "ev-fomc", cbc: "ev-cbc", macro: "ev-macro", drill: "ev-drill", uscn: "ev-uscn", manual: "ev-manual", world: "ev-world" };
 const WEEKDAY = "日一二三四五六";
 
 async function renderEvents(i, body, p) {
@@ -2914,7 +2916,7 @@ async function renderEvents(i, body, p) {
   const kind = p.evKind || "";
   const days = p.evDays || 365;
   const bar = h("div", { class: "ranges" });
-  [["", "全部"], ["history", "歷史大事"], ["move", "指數大波動"], ["fomc", "Fed 決策"], ["cbc", "台灣央行"], ["macro", "美國數據"], ["manual", "自訂"], ["world", "世界事件"]].forEach(([k, l]) =>
+  [["", "全部"], ["history", "歷史大事"], ["move", "指數大波動"], ["fomc", "Fed 決策"], ["cbc", "台灣央行"], ["macro", "美國數據"], ["uscn", "中美談判"], ["drill", "軍演"], ["manual", "自訂"], ["world", "世界事件"]].forEach(([k, l]) =>
     bar.append(h("button", { class: kind === k ? "on" : "", onclick: () => setPane(i, { evKind: k }) }, l)));
   bar.append(h("span", { class: "sep-s" }));
   [[183, "半年"], [365, "1 年"], [730, "2 年"], [1826, "5 年"], [3653, "10 年"]].forEach(([d, l]) =>
@@ -2989,7 +2991,7 @@ function evCard(i, e, p) {
       const more = h("button", { class: "mini", onclick: () => { hl.slice(3).forEach((n) => ul.append(evNewsLi(n))); more.remove(); } }, `更多新聞 ${hl.length - 3} 則`);
       main.append(more);
     }
-  } else if (["move", "fomc", "cbc", "history"].includes(e.kind) && !e.news_at) main.append(h("div", { class: "muted ev-sum" }, "新聞與 AI 摘要在背景整理中…"));
+  } else if (["move", "fomc", "cbc", "history", "drill", "uscn"].includes(e.kind) && !e.news_at && !e.upcoming) main.append(h("div", { class: "muted ev-sum" }, "新聞與 AI 摘要在背景整理中…"));
   if (!e.readonly) {
     const acts = h("div", { class: "ev-acts" });
     const idx = mv.length ? mv[0][0] : e.kind === "cbc" ? "TWD=X" : e.kind === "macro" || e.kind === "fomc" ? "^GSPC" : "^TWII";
@@ -3002,12 +3004,12 @@ function evCard(i, e, p) {
       } }, "📄 聲明／紀要／預測"));
       main.append(box);
     }
-    if (["move", "fomc", "cbc", "history"].includes(e.kind))
+    if (["move", "fomc", "cbc", "history", "drill", "uscn"].includes(e.kind) && !e.upcoming)
       acts.append(h("button", { class: "mini", title: "重抓當時新聞，讓本機 Ollama 重新命名（你改過的標題不會被覆蓋）", onclick: async (ev) => {
         ev.target.disabled = true; ev.target.textContent = "AI 撰寫中…";
         try { await api(`/api/events/ai/${encodeURIComponent(e.id)}`, { method: "POST" }); } catch (x) { flash(x.message); }
         S.panes[i].evFocus = e.id; renderPane(i);
-      } }, e.kind === "history" ? "重抓新聞" : "AI 重寫"));
+      } }, ["history", "drill", "uscn"].includes(e.kind) ? "重抓新聞" : "AI 重寫"));
     acts.append(h("button", { class: "mini", onclick: () => evEdit(i, card, e) }, "編輯"));
     acts.append(h("button", { class: "mini danger", onclick: async () => {
       try { await api(`/api/events/${encodeURIComponent(e.id)}`, { method: "DELETE" }); } catch (x) { flash(x.message); }
@@ -3545,6 +3547,8 @@ async function fxMarkers(i, chart, series, box, code, rng, pts, legend) {
     const more = es.length > 1 ? ` +${es.length - 1}` : "";
     if (e.kind === "fxmove") mk.push({ time: t, position: e.dir > 0 ? "aboveBar" : "belowBar", color: e.dir > 0 ? UP : DN, shape: e.dir > 0 ? "arrowUp" : "arrowDown", text: clip(e.title, 9) + more });
     else if (e.kind === "cbc") mk.push({ time: t, position: "belowBar", color: "#3ad6d6", shape: "square", text: "央行" + more });
+    else if (e.kind === "uscn") mk.push({ time: t, position: "aboveBar", color: "#7bd88f", shape: "circle", text: "中美" + more });
+    else if (e.kind === "drill") mk.push({ time: t, position: "aboveBar", color: "#ff6b6b", shape: "square", text: "軍演" + more });
     else if (e.kind === "macro") mk.push({ time: t, position: "belowBar", color: "#ff9f43", shape: "square", text: (/CPI/.test(e.title) ? "CPI" : /非農/.test(e.title) ? "非農" : "PCE") + more });
     else if (e.kind === "fomc") mk.push({ time: t, position: "belowBar", color: "#b48cff", shape: "square", text: "Fed" + more });
     else mk.push({ time: t, position: "aboveBar", color: e.kind === "history" ? "#e6e6e6" : "#ffd166", shape: "circle", text: e.label ? clip(e.title.replace(/（.*?）/g, ""), 7) + more : "" });

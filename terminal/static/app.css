@@ -598,6 +598,8 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .ev-tag.ev-fomc { color: #b48cff; border-color: #4b3a6e; }
 .ev-tag.ev-cbc { color: #3ad6d6; border-color: #1f5a5a; }
 .ev-tag.ev-macro { color: #ff9f43; border-color: #6b4a1f; }
+.ev-tag.ev-uscn { color: #7bd88f; border-color: #2d5a36; }
+.ev-tag.ev-drill { color: #ff6b6b; border-color: #6b2a2a; }
 .ev-tag.ev-manual { color: #ffd166; border-color: #4a3c14; }
 .ev-tag.ev-world { color: var(--cyan); border-color: #1d3a3a; }
 .ev-ai { font-size: 9.5px; color: #000; background: var(--cyan); padding: 0 4px; }

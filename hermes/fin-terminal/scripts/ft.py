@@ -19,6 +19,7 @@
   ft.py intel [--market tw|us|all]          市場情報：美股類股輪動、台美權值股強弱、市場廣度
   ft.py dca 0050,VOO,BTC-USD [--amount 5000] [--years 5] [--days 6]   定期定額回測（對比單筆投入）
   ft.py liquidity                            Fed 淨流動性（資產負債表 − TGA − 逆回購）與 S&P 500 相關
+  ft.py geo [uscn|drill]                     中美談判（休戰、川習會）／美軍與盟國聯合軍演時間線
   ft.py twmacro                              台灣總經：景氣燈號、經濟成長率、CPI、失業率、重貼現率、M1B／M2
   ft.py fomc [YYYY-MM-DD]                    Fed 會議：聲明措辭變化、AI 解讀、經濟預測（SEP）、會議紀要
   ft.py calendar [天數]                      接下來的 Fed／台灣央行／美國 CPI、非農、PCE 公布日
@@ -114,6 +115,9 @@ def main():
         if c == "intel":
             params = {"market": a.market}
         out = call(f"kit/{c}", params, timeout=180)
+    elif c in ("geo", "中美", "軍演"):
+        k = {"中美": "uscn", "軍演": "drill"}.get(c, words.strip())
+        out = call("geo", {"kind": k}, timeout=120)
     elif c in ("twmacro", "tw-macro", "台灣總經"):
         out = call("twmacro", timeout=180)
     elif c == "liquidity":

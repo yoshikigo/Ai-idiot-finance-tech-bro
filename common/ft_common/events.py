@@ -60,7 +60,7 @@ USREL = (
 )
 USREL_NAME = {"cpi": "美國 CPI", "nfp": "美國非農就業", "pce": "美國 PCE 物價"}
 KINDS = {"move": "市場大波動", "history": "歷史大事", "fomc": "Fed 利率決策", "cbc": "台灣央行理監事會", "macro": "美國數據公布",
-         "manual": "自訂", "world": "世界事件"}
+         "drill": "美軍與盟國軍演", "uscn": "中美談判", "manual": "自訂", "world": "世界事件"}
 
 
 def macro_actual(kind: str, ref: str) -> str | None:
@@ -132,6 +132,27 @@ HISTORY = [
     ("2026-07-17", "717 股災：台股史上最大跌點", "加權指數重挫 2,953.71 點（-6.47%）收 42,671.27，台積電跌 7.29%，外資單日賣超 1,890 億元創紀錄；前一晚費半跌 4.29%。"),
     ("2026-07-28", "中國晶片自主衝擊", "長鑫存儲上市首日大漲、傳中國自產浸潤式 DUV 曝光機，全球科技股走弱；台股跌 2,030.83 點（-4.65%），韓股跌逾 9% 觸發暫停交易。"),
 ]
+# Curated geopolitics: US / allied joint exercises and US–China talks. (date, kind, title, summary)
+# Facts only as reported; upcoming items say when they are not yet confirmed. Add new ones here (or with 自訂).
+GEO = [
+    ("2025-06-10", "uscn", "美中倫敦經貿會談", "美中經貿團隊 6/9–10 在倫敦會談，同意落實日內瓦共識的框架，焦點是中國稀土出口與美方技術出口管制。"),
+    ("2025-07-29", "uscn", "美中斯德哥爾摩會談", "第三輪會談（7/28–29）同意尋求延長 90 天關稅休戰，由川普拍板。"),
+    ("2025-08-11", "uscn", "美中關稅休戰延長 90 天", "川普簽令把對中國的關稅休戰延長 90 天，到 2025-11-10。"),
+    ("2025-09-15", "uscn", "美中馬德里會談（TikTok 框架）", "美中 9/14–15 在馬德里會談，就 TikTok 美國業務達成框架共識。"),
+    ("2025-10-26", "uscn", "美中吉隆坡會談", "川習會前的經貿會談（10/25–26），達成稀土、關稅、農產品等共識框架。"),
+    ("2026-09-23", "uscn", "美中休戰延長至 2027-01-10", "美國財長貝森特：雙方同意把釜山達成的關稅休戰（原 2026-11-10 到期）再延長兩個月至 2027-01-10；能否達成更全面協議仍不確定。"),
+    ("2026-09-24", "uscn", "習近平訪白宮（川習二會）", "習近平 9/23–25 國是訪問華府，9/24 白宮會談與國宴。未解議題：晶片出口管制、中伊關係、美國對台支持、AI 競爭。"),
+    ("2026-10-12", "uscn", "何立峰會見美企高層", "中國副總理何立峰會見美中關係全國委員會與蘋果庫克，稱兩國元首同意建立「建設性戰略穩定關係」，要落實元首共識。"),
+    ("2026-11-18", "uscn", "深圳 APEC：可能的川習（普）會", "APEC 峰會 11/18–19 在深圳。白宮內部討論在場邊舉行會談；普丁提議川習普三方會談談核武，川普 10/19 表示願意。尚未確定。"),
+    ("2027-01-10", "uscn", "美中關稅休戰到期", "延長後的休戰到期日；到期前是否再延長或達成全面協議，影響關稅、稀土與晶片管制。"),
+    ("2026-06-24", "drill", "環太平洋軍演 RIMPAC 2026", "美國太平洋艦隊主辦，6/24–7/31 在夏威夷周邊，30 國、約 3 萬人、30 多艘水面艦與 5 艘潛艦、200 多架飛機。"),
+    ("2026-09-18", "drill", "美加白令海「苔原梅林」聯演", "美國北方司令部與阿拉斯加司令部指揮，9/18–22 在白令海（荷蘭港以北），美方 F-35、E-3、海巡巡防艦，加拿大艦艇、潛艦與巡邏機；針對中俄在北極活動。"),
+    ("2026-10-14", "drill", "美菲南海海上合作活動", "美菲第 16 次海上合作活動，美艦 Warrior 與菲律賓海軍艦艇、空軍飛機在南海聯合操演。"),
+    ("2026-10-19", "drill", "美日「利劍 27」聯合軍演", "美日年度最大聯演（Keen Sword），10/19–29，以九州與西南群島為主（與那國、石垣）；日美近 6 萬人，澳、加及法、德等國參與部分科目。美軍首度在距台灣約 110 公里的與那國島部署反艦與防空飛彈。"),
+]
+GEO_KINDS = ("drill", "uscn")
+# built-in history events that belong to a thread too (shown when filtering by that kind)
+GEO_HIST = {"uscn": {"2025-04-09", "2025-05-12", "2025-10-10", "2025-10-30"}}
 NEWS_Q = "股市 OR 台股 OR 美股 OR 費半 OR 道瓊"
 
 
@@ -321,6 +342,10 @@ def refresh(period: str | None = None) -> dict:
             if not c.execute("SELECT 1 FROM events WHERE id=?", (eid,)).fetchone():
                 c.execute("INSERT INTO events(id,date,kind,auto_title,created,updated) VALUES(?,?,?,?,?,?)",
                           (eid, d, "fomc", "Fed 利率決策（FOMC）", now, now))
+        for d, k, title, summary in GEO:  # curated text may be corrected in later versions → keep auto_* in sync
+            eid = f"{k}:{d}"
+            c.execute("INSERT OR IGNORE INTO events(id,date,kind,created,updated) VALUES(?,?,?,?,?)", (eid, d, k, now, now))
+            c.execute("UPDATE events SET auto_title=?, auto_summary=? WHERE id=?", (title, summary, eid))
         for d in CBC:
             c.execute("INSERT OR IGNORE INTO events(id,date,kind,auto_title,created,updated) VALUES(?,?,?,?,?,?)",
                       (f"cbc:{d}", d, "cbc", "台灣央行理監事會", now, now))
@@ -351,7 +376,9 @@ def fetch_headlines(e: dict) -> list[dict]:
     start = dt.date.fromisoformat(e["date"]) - dt.timedelta(days=1)
     end_d = dt.date.fromisoformat(max([e["date"]] + [m["date"] for m in e.get("moves", {}).values()])) + dt.timedelta(days=2)
     q = ("聯準會 OR Fed OR 利率 OR 美股" if e["kind"] == "fomc" else
-         "央行 理監事會 OR 利率 OR 新台幣" if e["kind"] == "cbc" else NEWS_Q)
+         "央行 理監事會 OR 利率 OR 新台幣" if e["kind"] == "cbc" else
+         "軍演 OR 演習 OR 美軍 OR 解放軍 OR 台海" if e["kind"] == "drill" else
+         "美中 OR 中美 OR 關稅 OR 川習 OR 貿易" if e["kind"] == "uscn" else NEWS_Q)
     try:
         rows = twmarket.news_between(q, start.isoformat(), end_d.isoformat(), 15)
     except Exception as e2:  # noqa: BLE001
@@ -375,7 +402,7 @@ AI_SYSTEM = ("你是財經編輯。根據提供的指數變動與「當時的新
 def enrich(eid: str, llm: dict | None, *, news: bool = True, ai: bool = True) -> dict | None:
     with _conn() as c:
         e = _row(c, eid)
-    if not e or e["kind"] not in ("move", "fomc", "cbc", "history"):
+    if not e or e["kind"] not in ("move", "fomc", "cbc", "history", "drill", "uscn"):
         return e
     if news and not e.get("news_at"):
         e["headlines"] = fetch_headlines(e)
@@ -383,7 +410,7 @@ def enrich(eid: str, llm: dict | None, *, news: bool = True, ai: bool = True) ->
             c.execute("UPDATE events SET headlines=?, news_at=? WHERE id=?",
                       (json.dumps(e["headlines"], ensure_ascii=False), _now(), eid))
     fed_fact = e["kind"] == "fomc" and "DFEDTARU" in (e.get("auto_summary") or "")
-    if ai and llm and e["kind"] != "history" and not fed_fact and (e["kind"] == "move" or e["headlines"]):
+    if ai and llm and e["kind"] not in ("history", "drill", "uscn") and not fed_fact and (e["kind"] == "move" or e["headlines"]):
         from . import ollama
         try:
             raw = ollama.ask(llm, AI_SYSTEM, ai_prompt(e), json_mode=True)
@@ -406,7 +433,7 @@ def pending(limit: int = 50) -> list[str]:
     today = (dt.date.today() - dt.timedelta(days=2)).isoformat()
     with _conn() as c:
         return [r[0] for r in c.execute(
-            "SELECT id FROM events WHERE kind IN ('move','fomc','cbc','history') AND date<=? AND date>=? AND (news_at IS NULL OR "
+            "SELECT id FROM events WHERE kind IN ('move','fomc','cbc','history','drill','uscn') AND date<=? AND date>=? AND (news_at IS NULL OR "
             "(kind='move' AND ai_at IS NULL)) AND hidden=0 ORDER BY score DESC, date DESC LIMIT ?",
             (today, (dt.date.today() - dt.timedelta(days=int(os.environ.get("FT_EVENTS_ENRICH_DAYS", "4000")))).isoformat(), limit))]
 
@@ -427,9 +454,12 @@ def list_events(since: str | None = None, until: str | None = None, kinds: list[
     q, args = "SELECT * FROM events WHERE date>=? AND date<=?", [since, until]
     if not include_hidden:
         q += " AND hidden=0"
+    extra = sorted({d for k in (kinds or []) for d in GEO_HIST.get(k, ())})
     if kinds:
-        q += f" AND kind IN ({','.join('?' * len(kinds))})"
+        q += f" AND (kind IN ({','.join('?' * len(kinds))})"
         args += kinds
+        q += f" OR (kind='history' AND date IN ({','.join('?' * len(extra))})))" if extra else ")"
+        args += extra
     with _conn() as c:
         cur = c.execute(q + " ORDER BY date DESC", args)
         cols = [x[0] for x in cur.description]
@@ -465,7 +495,8 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
     the rest are drawn as bare arrows so a volatile year stays readable."""
     fx = symbol.startswith("TWFX:")  # currency charts: central banks + history; index moves don't belong there
     rows = list_events(since, until or dt.date.today().isoformat(),
-                       ["history", "fomc", "cbc", "macro", "manual"] if fx else ["move", "history", "fomc", "cbc", "macro", "manual"],
+                       ["history", "fomc", "cbc", "macro", "uscn", "drill", "manual"] if fx
+                       else ["move", "history", "fomc", "cbc", "macro", "uscn", "drill", "manual"],
                        world_too=False)
     years = max(1.0, (dt.date.fromisoformat((until or dt.date.today().isoformat())[:10]) - dt.date.fromisoformat(since[:10])).days / 365)
     moves = [e for e in rows if e["kind"] == "move"]
@@ -475,7 +506,7 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
     else:
         moves = sorted(moves, key=lambda e: -e["score"])[:int(top * min(years, 3))]
     if years > 3:  # long charts: Fed / central-bank days would bury everything else
-        rows = [e for e in rows if e["kind"] not in ("fomc", "cbc")]
+        rows = [e for e in rows if e["kind"] not in ("fomc", "cbc", "drill")]
     span_days = (dt.date.fromisoformat((until or dt.date.today().isoformat())[:10]) - dt.date.fromisoformat(since[:10])).days
     if span_days > 400:  # monthly data releases only on charts of a year or less
         rows = [e for e in rows if e["kind"] != "macro"]
@@ -490,6 +521,24 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
                     "summary": e["summary_final"][:200], "moves": e["moves"],
                     "label": e["id"] in strong or e["kind"] in ("manual", "history")})
     return out
+
+
+def geo_text(kinds: tuple[str, ...] = GEO_KINDS, days_back: int = 400, days_ahead: int = 120) -> str:
+    """美軍與盟國軍演、中美談判：近一年與接下來的時間線（含當時新聞標題）。"""
+    today = dt.date.today()
+    rows = list_events((today - dt.timedelta(days=days_back)).isoformat(), (today + dt.timedelta(days=days_ahead)).isoformat(),
+                       list(kinds), world_too=False)
+    lines = []
+    for k in kinds:
+        rs = sorted([e for e in rows if e["kind"] == k or (e["kind"] == "history" and e["date"] in GEO_HIST.get(k, ()))],
+                    key=lambda e: e["date"])
+        if not rs:
+            continue
+        lines.append(f"【{KINDS[k]}】")
+        for e in rs:
+            lines.append(f"- {e['date']}{'（即將）' if e['upcoming'] else ''} {e['title_final']}：{e['summary_final']}")
+            lines += [f"    · {h['title']}" for h in e["headlines"][:2]]
+    return "\n".join(lines) or "（沒有資料）"
 
 
 def add(date: str, title: str, summary: str = "") -> str:
