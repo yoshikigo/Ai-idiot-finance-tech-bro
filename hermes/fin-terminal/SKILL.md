@@ -30,6 +30,7 @@ python3 /opt/data/skills/fin-terminal/scripts/ft.py <指令> [參數]
 | 「KO 便宜嗎」「Graham／葛拉漢」「F-score」「護城河」 | `ft.py value KO` |
 | 「最近哪些類股強」「類股輪動」「市場廣度」「今天台股權值誰最強」 | `ft.py intel --market tw`（tw／us／all） |
 | 「市場資金面怎樣」「Fed 淨流動性」「逆回購／TGA」「縮表」 | `ft.py liquidity` |
+| 「美股各產業占比」「台股哪個產業權重最大」「今天哪些類股強」 | `ft.py sectors us`／`ft.py sectors tw` |
 | 「中美談判進度」「關稅休戰何時到期」「川習會」 | `ft.py geo uscn` |
 | 「美軍最近有什麼軍演」「利劍軍演」「RIMPAC」 | `ft.py geo drill` |
 | 「台灣景氣燈號」「台灣總經」「央行重貼現率」「M1B M2 黃金交叉」「台灣 CPI／失業率／經濟成長率」 | `ft.py twmacro` |

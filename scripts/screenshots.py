@@ -37,7 +37,7 @@ async def main(only):
         pages = [("02-chart-events", "1 ^TWII", 4000), ("03-etf", "1 ETF", 3000), ("04-etf-detail", "1 0056 概況", 3000),
                  ("05-focus", "1 焦點", 3500), ("06-supply-chain", "1 供應鏈 CoWoS", 3500), ("07-events", "1 大事", 3000),
                  ("08-macro-us", "1 總經 NETLIQ", 4000), ("09-macro-tw", "1 台經 SIGNAL", 4000), ("10-twfx", "1 台幣 JPY", 4000),
-                 ("11-toolkit", "1 技術 2330", 4000)]
+                 ("11-toolkit", "1 技術 2330", 4000), ("15-sectors-us", "1 產業 美股", 4000), ("16-sectors-tw", "1 產業 台股", 4000)]
         for name, c, w in pages:
             if only and name not in only: continue
             await cmd(pg, c, 800); await pg.evaluate(MAXI); await pg.wait_for_timeout(w); await shot(name)

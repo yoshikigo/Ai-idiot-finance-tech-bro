@@ -730,3 +730,16 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .tw-card .tw-light { margin-left: 0; align-self: flex-start; }
 .tw-bands { margin: 4px 0 8px; }
 .tw-bands .tw-light { margin-left: 4px; }
+/* 產業分布 */
+.sec-top { display: flex; gap: 16px; align-items: flex-start; padding: 8px 4px; flex-wrap: wrap; }
+.sec-pie { position: relative; width: 230px; height: 230px; flex: 0 0 auto; }
+.sec-pie svg { display: block; }
+.sec-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; gap: 2px; }
+.sec-center b { color: var(--amber); font-size: 1.15em; }
+.sec-list { flex: 1 1 420px; min-width: 0; }
+.sec-dot { display: inline-block; width: 9px; height: 9px; border-radius: 2px; margin-right: 6px; vertical-align: middle; }
+.sec-bar { height: 8px; border-radius: 2px; opacity: .85; }
+.sec-detail { padding: 4px 4px 10px; }
+.sec-detail h5 { margin: 6px 0; color: var(--amber); }
+.sec-inds { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
+.sec-inds .chip { border: 1px solid #2a2f35; padding: 0 6px; font-size: .85em; color: var(--muted); }

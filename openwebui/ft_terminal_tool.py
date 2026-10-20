@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.16.0
+version: 0.17.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -252,6 +252,18 @@ class Tools:
         """
         await self._status(__event_emitter__, "市場情報")
         out = await self._get("kit/intel", {"market": market}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def sector_breakdown(self, market: str = "us", __event_emitter__: Emitter = None) -> str:
+        """
+        產業分布：各產業的市值占比、今日市值加權漲跌、前幾大成分股。美股依 Nasdaq 產業分類（科技、金融、醫療、工業／製造、
+        運輸航運、農業、能源…），台股依證交所產業別（半導體、金融保險、航運、塑膠、鋼鐵…）。
+        :param market: "us"＝美股、"tw"＝台股
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, "產業分布")
+        out = await self._get("sectors", {"market": market}, timeout=180)
         await self._status(__event_emitter__, "完成", True)
         return out
 

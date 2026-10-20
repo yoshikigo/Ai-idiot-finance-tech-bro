@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from ft_common import context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmacro, twmarket, world
+from ft_common import context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, sectors, supplychain, twmacro, twmarket, world
 
 DATA = Path(os.environ.get("FT_DATA", "/data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -81,6 +81,7 @@ NAMES = {"^TWOII": "櫃買指數", "^GSPC": "S&P 500", "^DJI": "道瓊工業", "
          "2382.TW": "廣達", "3711.TW": "日月光投控", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金",
          "2303.TW": "聯電", "2412.TW": "中華電", "3231.TW": "緯創", "6669.TW": "緯穎", "2603.TW": "長榮",
          "3661.TW": "世芯-KY", "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum", "SOL-USD": "Solana"}
+NAMES.update({k: v for k, v in sectors.US_ZH.items() if k not in NAMES})  # 美股中文名（監控表、自選）
 
 from ft_common.engine import _safe_json_response  # noqa: E402
 
@@ -416,6 +417,7 @@ async def api_translate(req: Request):
 
 
 # ------------------------------------------------------------------ ASK (streaming chat)
+SECTOR_WORDS = ("產業分布", "產業別", "產業占比", "產業比重", "類股", "族群占比", "各產業", "哪個產業", "權重最大")
 USCN_WORDS = ("中美", "美中", "川習", "習川", "貿易戰", "關稅休戰", "休戰", "和談", "貿易協議", "何立峰", "貝森特", "APEC")
 DRILL_WORDS = ("軍演", "演習", "聯演", "利劍", "RIMPAC", "環太平洋", "與那國", "台海", "解放軍", "美軍")
 TW_MACRO_WORDS = ("台灣總經", "景氣燈號", "景氣對策", "對策信號", "藍燈", "紅燈", "黃紅燈", "黃藍燈", "重貼現率", "央行",
@@ -471,6 +473,12 @@ async def api_ask(req: Request):
     if any(k in last_q for k in ("匯率", "台幣", "新台幣", "美元", "日圓", "日幣", "人民幣", "歐元", "韓元", "換匯", "升值", "貶值")):
         try:
             parts.append(await run_in_threadpool(fx.text, None))
+        except Exception:  # noqa: BLE001
+            pass
+    if any(k in last_q for k in SECTOR_WORDS):
+        try:
+            mk = "tw" if any(k in last_q for k in ("台股", "台灣", "上市", "上櫃")) else "us"
+            parts.append(await run_in_threadpool(sectors.text, mk, 3))
         except Exception:  # noqa: BLE001
             pass
     geo_k = tuple(k for k, words in (("uscn", USCN_WORDS), ("drill", DRILL_WORDS)) if any(w in last_q for w in words))
@@ -936,6 +944,14 @@ def api_macro_series(id: str, years: float = 10):  # noqa: A002
     try:
         meta = fred.SERIES.get(id, (id, "", "level", "", ""))
         return {"id": id, "name": meta[0], "unit": meta[1], "how": meta[2], "note": meta[4], "points": fred.history(id, years)}
+    except Exception as e:  # noqa: BLE001
+        _err(e)
+
+
+@app.get("/api/sectors")
+def api_sectors(market: str = "us", top: int = 30):  # noqa: A002
+    try:
+        return sectors.breakdown(market, max(5, min(top, 100)))
     except Exception as e:  # noqa: BLE001
         _err(e)
 

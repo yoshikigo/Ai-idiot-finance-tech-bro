@@ -64,9 +64,9 @@ const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: 
 const KIT_TABS = [["tech", "技術面"], ["options", "選擇權"], ["research", "評等籌碼"], ["earnings", "財報季"], ["value", "價值檢查"], ["intel", "市場情報"]];
 const KIT_WORD = { "技術": "tech", "技術面": "tech", "技術分析": "tech", "選擇權": "options", "期權": "options", "評等": "research", "籌碼": "research", "目標價": "research", "法人": "research", "財報季": "earnings", "EPS": "earnings", "法說": "earnings", "價值": "value", "價值投資": "value", "情報": "intel", "類股輪動": "intel", "市場情報": "intel", "工具箱": "tech" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
-const MON_TITLE = { TWFX: "台幣匯率", MACRO: "美國總經（FRED）", TWMACRO: "台灣總經", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
+const MON_TITLE = { SECTOR: "產業分布", TWFX: "台幣匯率", MACRO: "美國總經（FRED）", TWMACRO: "台灣總經", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
 const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
-const ZH_CMD = { "台灣總經": "TWMACRO", "台經": "TWMACRO", "國內總經": "TWMACRO", "景氣燈號": "TWMACRO", "燈號": "TWMACRO", "景氣": "TWMACRO", "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
+const ZH_CMD = { "產業": "SECTOR", "產業分布": "SECTOR", "類股": "SECTOR", "美股產業": "SECTOR", "台股產業": "SECTOR", "台灣總經": "TWMACRO", "台經": "TWMACRO", "國內總經": "TWMACRO", "景氣燈號": "TWMACRO", "燈號": "TWMACRO", "景氣": "TWMACRO", "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
   "持股": "HOLD", "我的持股": "HOLD", "庫存": "HOLD", "登入": "HOLD", "走勢": "GP", "K線": "GP", "線圖": "GP", "盤中": "GIP", "概況": "DES", "資料": "DES", "新聞": "N", "財報": "FA",
   "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "TWFX", "台幣": "TWFX", "台幣匯率": "TWFX", "換匯": "TWFX", "商品": "CMDTY", "原物料": "CMDTY",
   "利率": "RATES", "加密": "CRYPTO", "說明": "HELP", "幫助": "HELP", "研究": "LAB", "策略": "LAB", "回測": "LAB", "選股": "LAB", "策略研究": "LAB", "資料庫": "DATA", "目錄": "DATA", "基金": "FUND", "熱門ETF": "TWETF", "ETF排行": "ETF",
@@ -155,7 +155,7 @@ function clocks() {
 
 function buildFkeys() {
   const keys = [
-    ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["TWMACRO", "台經"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
+    ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["TWMACRO", "台經"], ["SECTOR", "產業"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
     ["CMDTY", "商品"], ["RATES", "利率"], ["CRYPTO", "加密"], "|", ["GP", "走勢"], ["GIP", "盤中"], ["DES", "概況"], ["N", "新聞"], ["FA", "財報"], "|",
     ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
   ];
@@ -249,6 +249,11 @@ async function run(raw) {
   if (head === "EVENTS" || head === "EV") return setPane(target, { fn: "EVENTS" });
   if (head === "LEDGER" || head === "LOG") return setPane(target, { fn: "LEDGER", lgQ: tail.join(" ") });
   if (head === "TWFX") return setPane(target, { fn: "TWFX", fxSel: tail.join(" ") || S.panes[target].fxSel || "" });
+  if (head === "SECTOR") {
+    const w = t.join(" ");
+    const mkt = /台|TW/i.test(w) ? "tw" : /美|US/i.test(w) ? "us" : S.panes[target].secMkt || "us";
+    return setPane(target, { fn: "SECTOR", secMkt: mkt, secSel: "" });
+  }
   if (head === "TWMACRO" || head === "TWM") return setPane(target, { fn: "TWMACRO", twmId: (tail[0] || "").toUpperCase() || S.panes[target].twmId || "" });
   if (head === "MACRO") return setPane(target, { fn: "MACRO", fredId: (tail[0] || "").toUpperCase() || S.panes[target].fredId || "" });
   if (head === "HOLD") return setPane(target, { fn: "HOLD" });
@@ -361,7 +366,7 @@ function renderPane(i) {
     fns.append(h("button", { title: "TradingAgents 多代理人分析", onclick: (e) => { e.stopPropagation(); openSide("tradingagents"); prefillEngine("tradingagents", p.sec); } }, "AI▸"));
   }
   fns.append(h("button", { title: "最大化", onclick: (e) => { e.stopPropagation(); toggleMax(i); } }, "⤢"));
-  const R = { KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
+  const R = { SECTOR: renderSector, KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
               ETFM: renderETFMon, FUNDS: renderFundSearch, FUNDD: renderFund, WORLD: renderWorld, LAYA: renderLaya, LAB: renderLab, DATA: renderData };
   if (R[p.fn]) R[p.fn](i, body, p);
   else if (MON_FNS.includes(p.fn)) renderMon(i, body, p);
@@ -1216,7 +1221,10 @@ async function renderMon(i, body, p) {
     const d = await api(`/api/monitor/${p.fn}`);
     if (S.panes[i].fn !== p.fn) return;
     $(".pane-name", paneEl(i)).textContent = "單擊在下一格看圖、雙擊在本格";
-    body.innerHTML = ""; body.append(quoteTable(d.rows));
+    body.innerHTML = "";
+    if (p.fn === "MAG7" || p.fn === "TW") body.append(h("div", { class: "ranges" }, h("span", { class: "grow" }),
+      h("button", { onclick: () => setPane(i, { fn: "SECTOR", secMkt: p.fn === "TW" ? "tw" : "us", secSel: "" }) }, `🥧 ${p.fn === "TW" ? "台股" : "美股"}產業分布 ▸`)));
+    body.append(quoteTable(d.rows));
     if (d.rows.some((r) => r.indicative)) body.append(h("div", { class: "hint", style: "padding:4px 10px" }, "* 試算價：該時點無成交，以最佳買賣價中間值顯示"));
   } catch (e) { body.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
 }
@@ -1515,6 +1523,7 @@ function renderHelp(i, body) {
   body.innerHTML = `<div class="help">
   <h4>指令（直接打字進入指令列，Enter 或 GO 執行；中文名稱、代號都可以）</h4>
   <table>
+    <tr><td>產業分布（SECTOR）· 產業 美股 · 產業 台股</td><td>美股（Nasdaq 產業分類，另獨立出運輸航運、農業）與台股（證交所產業別）各產業的市值占比圓餅圖、今日漲跌；點產業看成分股（市值、產業內與市場占比），單擊成分股在下一格看圖</td></tr>
     <tr><td>台灣總經（TWMACRO）· 台經 · 景氣燈號</td><td>國發會景氣對策信號（分數與燈號）、領先／同時指標、經濟成長率、CPI／核心 CPI、失業率、央行重貼現率、隔夜拆款利率、M1B／M2 年增率（含黃金／死亡交叉）；點一列看長期走勢，可疊加權指數</td></tr>
     <tr><td>總經（MACRO）· 總經 DGS10</td><td>美國總經（FRED 官方）：Fed 利率、美債殖利率與利差、CPI／PCE、失業率、非農、GDP、信心、衰退機率、信用利差、VIX、美元、M2、油價；點一列看長期走勢（可加上 Fed 決策標記）</td></tr>
     <tr><td>紀錄（LEDGER）· 紀錄 2330</td><td>分析紀錄與檢討：每次 AI 分析的時間、Agent／模型、標的、結論；5／20／60 個交易日後自動用實際股價核對對錯與超額報酬；各 Agent 命中率；「🤖 AI 檢討」整理成給該 Agent 的提醒，下次分析自動帶入（可關）</td></tr>
@@ -3332,6 +3341,86 @@ async function macroChart(i, box, id, p) {
       } catch (e) {}
     }
   });
+}
+
+/* ---------- 產業分布：圓餅圖（市值占比）＋各產業成分股 */
+function donutSvg(items, size = 220, sel = "") {
+  const r = size / 2, r0 = r * 0.58, tot = items.reduce((a, x) => a + x.weight, 0) || 1;
+  let a0 = -Math.PI / 2;
+  const P = (a, rr) => `${(r + rr * Math.cos(a)).toFixed(2)},${(r + rr * Math.sin(a)).toFixed(2)}`;
+  const segs = items.map((x) => {
+    const a1 = a0 + (x.weight / tot) * Math.PI * 2, big = a1 - a0 > Math.PI ? 1 : 0, off = x.name === sel ? 6 : 0;
+    const mid = (a0 + a1) / 2, dx = off * Math.cos(mid), dy = off * Math.sin(mid);
+    const d = a1 - a0 >= Math.PI * 2 - 1e-6
+      ? `M${P(0, r - 2)}A${r - 2},${r - 2} 0 1 1 ${P(Math.PI, r - 2)}A${r - 2},${r - 2} 0 1 1 ${P(0, r - 2)}Z`
+      : `M${P(a0, r - 8)}A${r - 8},${r - 8} 0 ${big} 1 ${P(a1, r - 8)}L${P(a1, r0)}A${r0},${r0} 0 ${big} 0 ${P(a0, r0)}Z`;
+    a0 = a1;
+    return `<path d="${d}" fill="${x.color}" transform="translate(${dx.toFixed(1)},${dy.toFixed(1)})" data-n="${esc(x.name)}" style="cursor:pointer;opacity:${sel && x.name !== sel ? 0.45 : 1}"><title>${esc(x.name)} ${x.weight.toFixed(1)}%</title></path>`;
+  });
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${segs.join("")}</svg>`;
+}
+const capFmt = (v, mkt) => (v == null ? "—" : mkt === "tw" ? (v >= 1e12 ? nf(v / 1e12, 2) + " 兆" : nf(v / 1e8, 0) + " 億") : (v >= 1e12 ? nf(v / 1e12, 2) + " 兆" : nf(v / 1e9, 1) + " B"));
+
+async function renderSector(i, body, p) {
+  const mkt = p.secMkt || "us";
+  body.classList.add("mc-body");
+  body.innerHTML = "";
+  const bar = h("div", { class: "ranges" },
+    ...[["us", "🇺🇸 美股"], ["tw", "🇹🇼 台股"]].map(([k, l]) => h("button", { class: mkt === k ? "on" : "", onclick: () => setPane(i, { secMkt: k, secSel: "" }) }, l)),
+    h("span", { class: "legend sec-src" }), h("span", { class: "grow" }),
+    h("button", { onclick: () => setPane(i, { fn: mkt === "tw" ? "TW" : "MAG7" }) }, mkt === "tw" ? "台股焦點 ▸" : "美股科技 ▸"),
+    h("button", { onclick: () => { setFocus(i); askSend(`根據目前${mkt === "tw" ? "台股" : "美股"}各產業的市值占比與今日漲跌，說明市場結構（哪些產業權重最大、集中度如何）、今天資金流向哪些產業，以及對投資組合配置的意涵。`); } }, "問 AI 產業 ▸"));
+  const holder = h("div", {}, h("div", { class: "loading" }, `計算${mkt === "tw" ? "台股" : "美股"}各產業市值`));
+  body.append(bar, holder);
+  let d;
+  try { d = await api(`/api/sectors?market=${mkt}&top=40`); } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  if (S.panes[i].fn !== "SECTOR" || (S.panes[i].secMkt || "us") !== mkt) return;
+  holder.innerHTML = "";
+  $(".sec-src", body).textContent = `資料：${d.source}`;
+  // pie: top 11 + 其他
+  const main = d.sectors.slice(0, 11), rest = d.sectors.slice(11);
+  const pie = main.map((x) => ({ name: x.name, weight: x.weight, color: x.color }));
+  if (rest.length) pie.push({ name: `其他 ${rest.length} 類`, weight: rest.reduce((a, x) => a + x.weight, 0), color: "#5b636b" });
+  const sel = p.secSel || "";
+  const pieBox = h("div", { class: "sec-pie" });
+  pieBox.innerHTML = donutSvg(pie, 230, sel);
+  pieBox.append(h("div", { class: "sec-center" }, h("small", { class: "muted" }, mkt === "tw" ? "台股總市值" : "美股總市值"),
+      h("b", {}, `${nf(d.total_display, 1)} ${d.unit}`), h("small", { class: "muted" }, `${nf(d.count, 0)} 檔`)));
+  pieBox.addEventListener("click", (e) => { const n = e.target.closest("path") && e.target.closest("path").dataset.n; if (n && !n.startsWith("其他 ")) setPane(i, { secSel: sel === n ? "" : n }); });
+  const t = h("table", { class: "grid mc-tbl sec-tbl" });
+  t.innerHTML = `<thead><tr><th>產業</th><th>占比</th><th></th><th>今日</th><th>檔數</th><th style="text-align:left">最大成分股</th></tr></thead>`;
+  const tb = h("tbody");
+  const maxW = Math.max(...d.sectors.map((x) => x.weight), 1);
+  for (const s of d.sectors) {
+    tb.append(h("tr", { class: "click" + (sel === s.name ? " hl" : ""), onclick: () => setPane(i, { secSel: sel === s.name ? "" : s.name }) },
+      h("td", { class: "nm" }, h("span", { class: "sec-dot", style: `background:${s.color}` }), s.name),
+      h("td", {}, h("b", {}, nf(s.weight, 1) + "%")),
+      h("td", { style: "width:120px" }, h("div", { class: "sec-bar", style: `width:${(s.weight / maxW * 100).toFixed(1)}%;background:${s.color}` })),
+      h("td", { class: cls(s.pct) }, s.pct == null ? "—" : pct(s.pct)), h("td", { class: "muted" }, nf(s.count, 0)),
+      h("td", { style: "text-align:left", class: "muted" }, s.stocks.slice(0, 3).map((x) => x.name).join("、"))));
+  }
+  t.append(tb);
+  holder.append(h("div", { class: "sec-top" }, pieBox, h("div", { class: "sec-list" }, t)));
+  const cur = d.sectors.find((x) => x.name === sel) || d.sectors[0];
+  if (!cur) return;
+  const det = h("section", { class: "sec-detail" });
+  det.append(h("h5", {}, h("span", { class: "sec-dot", style: `background:${cur.color}` }), `${cur.name}　占市場 ${nf(cur.weight, 1)}%・${cur.count} 檔・今日 `,
+    h("span", { class: cls(cur.pct) }, cur.pct == null ? "—" : pct(cur.pct)),
+    h("span", { class: "muted" }, sel ? "　（點同一列取消）" : "　（點上面的產業切換）")));
+  if (cur.industries && cur.industries.length) det.append(h("div", { class: "sec-inds" }, ...cur.industries.map((x) => h("span", { class: "chip" }, `${x.name} ${nf(x.weight, 0)}%`))));
+  const st = h("table", { class: "grid mc-tbl" });
+  st.innerHTML = `<thead><tr><th>代號</th><th style="text-align:left">名稱</th><th>價格</th><th>漲跌幅</th><th>市值</th><th>產業內占比</th><th>市場占比</th>${mkt === "us" ? '<th style="text-align:left">細產業</th>' : '<th style="text-align:left">市場</th>'}</tr></thead>`;
+  const sb = h("tbody");
+  for (const x of cur.stocks) {
+    sb.append(h("tr", { class: x.symbol ? "click" : "", title: x.symbol ? "單擊在下一格看圖" : "", onclick: () => x.symbol && quickOpen(x.symbol) },
+      h("td", { class: "sym" }, x.symbol ? x.symbol.replace(/\.TWO?$/, "") : "—"), h("td", { style: "text-align:left" }, x.name || ""),
+      h("td", {}, x.price == null ? "—" : nf(x.price, pxd(x.price))), h("td", { class: cls(x.pct) }, x.pct == null ? "—" : pct(x.pct)),
+      h("td", {}, capFmt(x.cap, mkt)), h("td", {}, nf(x.weight_group, 1) + "%"), h("td", { class: "muted" }, nf(x.weight_market, 2) + "%"),
+      h("td", { style: "text-align:left", class: "muted" }, x.industry || "")));
+  }
+  st.append(sb);
+  det.append(st);
+  holder.append(det);
 }
 
 /* ---------- 台灣總經：國發會景氣燈號、主計總處 GDP／CPI／失業率、央行利率與貨幣供給 */

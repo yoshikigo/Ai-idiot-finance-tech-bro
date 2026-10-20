@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from ft_common import context, dca, edgar, fomc, toolkit, events, focus, fred, funds, fx, ledger, notes, supplychain, twmacro, twmarket, world
+from ft_common import context, dca, edgar, fomc, toolkit, events, focus, fred, funds, fx, ledger, notes, sectors, supplychain, twmacro, twmarket, world
 
 router = APIRouter(prefix="/api/agent")
 _hooks: dict = {}  # set by app.py: settings loader, llm block, engines map
@@ -209,6 +209,14 @@ def major_events(days: int = 365, plain: bool = False, format: str = "text"):  #
         lines.append(f"{e['date']} {e['title_final']}{tag}" + (f"｜{mv}" if mv else "")
                      + (f"\n  {e['summary_final']}" if e["summary_final"] else ""))
     return _out("【市場重大事件】\n" + "\n".join(lines or ["（還沒有偵測到事件）"]), plain, rows, format)
+
+
+@router.get("/sectors")
+def sectors_text(market: str = "us", n: int = 3, plain: bool = False, format: str = "text"):  # noqa: A002
+    """產業分布：market＝us（美股，依 Nasdaq 產業分類，另獨立出運輸航運、農業）或 tw（台股，證交所產業別）；
+    各產業市值占比、今日漲跌、前 n 大成分股。"""
+    mk = "tw" if market.lower() in ("tw", "台股") else "us"
+    return _out(sectors.text(mk, max(1, min(n, 10))), plain, None, format)
 
 
 @router.get("/geo")
@@ -610,6 +618,7 @@ HELP = """FT Terminal agent API（全部 GET，除了 analyze）
 /api/agent/sec?q=NVDA                             美股 SEC 最近申報＋年度財報（需 FT_SEC_USER_AGENT）
 /api/agent/ledger                                 AI 分析紀錄：各 agent 5／20／60 日命中率、最近檢討與提醒
 /api/agent/events?days=365                        近一年市場重大事件（指數大波動、Fed 決策、中美談判、軍演、自訂）＋AI 摘要
+/api/agent/sectors?market=us|tw                   美股／台股產業分布（市值占比、今日漲跌、前幾大成分股）
 /api/agent/geo?kind=uscn|drill                    中美談判／美軍與盟國聯合軍演時間線（含接下來的日程）
 /api/agent/chain   /api/agent/chain?q=CoWoS        供應鏈：各環節今日漲跌／某環節（或某檔股票所在環節）的上下游與成分股
 /api/agent/world?q=2603  或 ?region=台灣,紅海      現實世界訊號（God's Eye View：地震、軍機、航運、氣旋）
