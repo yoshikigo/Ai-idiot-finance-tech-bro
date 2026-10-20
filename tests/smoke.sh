@@ -77,6 +77,7 @@ n=$(j "sum(1 for r in d['rows'] if 'value' in r)" <<<"$raw" 2>/dev/null) && [[ $
   || bad "FRED：${n:-0}/2 — $(j "'；'.join(r['id']+' '+r.get('error','') for r in d['rows'] if 'value' not in r)" <<<"$raw" 2>/dev/null || echo "${raw:0:200}")"
 n=$(curl -fsS -m 150 "$B/api/twfx" | j "f\"{sum(1 for r in d['rows'] if 'twd' in r)} 幣別、台銀 {len(d['bot']['rates'])} 筆、USD {next(r['twd'] for r in d['rows'] if r['code']=='USD'):.3f}\"") && ok "台幣匯率：$n" || bad "台幣匯率 /api/twfx"
 n=$(curl -fsS -m 150 -XPOST -H 'content-type: application/json' -d '{"symbols":"0050,VOO","amount":5000,"start":"2021-01-01"}' "$B/api/dca/backtest" | j "'；'.join(f\"{r['symbol']} 年化 {r['xirr']:.1f}%\" if 'xirr' in r and r['xirr'] is not None else f\"{r['symbol']} {r.get('error','?')}\" for r in d['results'])") && ok "定期定額回測：$n" || bad "定期定額回測 /api/dca/backtest"
+n=$(curl -fsS -m 150 "$B/api/fomc/2026-09-16" | j "f\"聲明 {len((d.get('statement') or {}).get('text') or '')} 字、變化 {d.get('changes')} 處、SEP {'有' if d.get('sep') else '無'}\"") && ok "FOMC 文件 2026-09-16：$n" || bad "FOMC 文件 /api/fomc"
 if grep -q '^FT_SEC_USER_AGENT=.*@' "$HOME/.config/fin-terminal/fin-terminal.env" 2>/dev/null; then
   s=$(curl -fsS "$B/api/sec/filings?s=NVDA&limit=3" | j "d['enabled'] and len(d['filings'])") && [[ $s != False && $s -ge 1 ]] && ok "SEC EDGAR：NVDA 最近申報 $s 筆" || bad "SEC EDGAR 申報：$s"
   s=$(curl -fsS "$B/api/sec/financials?s=NVDA" | j "d['periods'][0]['end'] + ' 申報 ' + d['periods'][0]['filed']") && ok "SEC XBRL 財報：$s" || bad "SEC XBRL 財報"

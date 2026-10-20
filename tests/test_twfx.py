@@ -85,6 +85,7 @@ def test_twfx_events_and_forecast_series(tmp_path, monkeypatch):
     monkeypatch.setattr(twmarket, "FAKE", True)
     monkeypatch.setattr(fred, "fed_decision", lambda d: None)
     monkeypatch.setattr(events, "load_closes", lambda period: {})
+    monkeypatch.setattr(events, "macro_actual", lambda k, ref: None)
     events.refresh("2y")
     rows = {e["id"]: e for e in events.list_events("2025-01-01", "2027-01-01", ["cbc"], world_too=False)}
     assert "cbc:2026-09-17" in rows and rows["cbc:2026-09-17"]["kind_name"] == "台灣央行理監事會"

@@ -597,6 +597,7 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .ev-tag.ev-move { color: var(--amber); border-color: var(--amber-dim); }
 .ev-tag.ev-fomc { color: #b48cff; border-color: #4b3a6e; }
 .ev-tag.ev-cbc { color: #3ad6d6; border-color: #1f5a5a; }
+.ev-tag.ev-macro { color: #ff9f43; border-color: #6b4a1f; }
 .ev-tag.ev-manual { color: #ffd166; border-color: #4a3c14; }
 .ev-tag.ev-world { color: var(--cyan); border-color: #1d3a3a; }
 .ev-ai { font-size: 9.5px; color: #000; background: var(--cyan); padding: 0 4px; }
@@ -698,3 +699,24 @@ button.mini.danger { color: var(--down); border-color: #5a2020; }
 .dca-sum { margin: 8px 0 4px; }
 .dca-ai .md { font-size: 13px; line-height: 1.6; }
 .dca-quick { flex-direction: row !important; flex-wrap: wrap; gap: 4px !important; }
+
+/* 分析工具箱 */
+.kit-out { padding: 8px 12px 16px; overflow: auto; }
+.kit-out .md table { border-collapse: collapse; font-size: 12px; margin: 6px 0; }
+.kit-out .md th, .kit-out .md td { border-bottom: 1px solid var(--line); padding: 2px 8px; }
+.kit-out .md h3 { color: var(--amber); margin: 4px 0 8px; font-size: 14px; }
+.kit-out .md li { margin: 2px 0; }
+.kit-exp select { background: #0b0b0b; border: 1px solid var(--line-2); color: var(--text); padding: 2px 6px; }
+
+/* FOMC 文件 */
+.fomc-box { margin-top: 8px; border-top: 1px dashed var(--line-2); padding-top: 6px; }
+.fomc-sec { margin: 6px 0 10px; }
+.fomc-sec h5 { margin: 0 0 4px; color: var(--amber); font-size: 12px; }
+.fomc-diff { font-size: 12px; line-height: 1.6; max-height: 260px; overflow: auto; background: #0b0b0b; border: 1px solid var(--line); padding: 6px 8px; }
+.fd-add { color: #9be564; background: rgba(155, 229, 100, .08); }
+.fd-del { color: #ff6b6b; text-decoration: line-through; }
+.fd-same { color: var(--text); }
+.fomc-ai { margin-top: 4px; font-size: 12px; }
+.sep-tbl td:nth-child(n+2), .sep-tbl th:nth-child(n+2) { text-align: right; }
+.sep-tbl small { font-size: 10px; }
+.mc-sep { padding: 6px 8px; }

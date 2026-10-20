@@ -29,6 +29,7 @@ def ev(tmp_path, monkeypatch):
     monkeypatch.setattr(events.market, "history", lambda sym, period, interval: data[sym])
     from ft_common import fred
     monkeypatch.setattr(fred, "fed_decision", lambda d: None)  # offline
+    monkeypatch.setattr(events, "macro_actual", lambda k, ref: None)
     monkeypatch.setattr(events.twmarket, "news_between", lambda q, a, b, n: [
         {"title": f"關稅衝擊全球股市 {a}", "publisher": "測試社", "link": "https://example.com/a", "time": a}])
     return events

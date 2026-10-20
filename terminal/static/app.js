@@ -57,10 +57,12 @@ const md = (s) => DOMPurify.sanitize(marked.parse(String(s || ""), { breaks: fal
 
 /* ------------------------------------------------------------ symbols / commands */
 const EXCH = { TT: ".TW", TW: ".TW", TWO: ".TWO", US: "", JP: ".T", JT: ".T", HK: ".HK", LN: ".L", GR: ".DE", GY: ".DE", FP: ".PA", KS: ".KS", CN: ".TO", AU: ".AX" };
-const PANE_FNS = ["GP", "GIP", "DES", "N", "FA", "ETF", "LAYA"];
-const STOCK_FNS = ["GP", "GIP", "DES", "N", "FA", "LAYA"];
-const ETF_FNS = ["GP", "GIP", "ETF", "N", "LAYA"];
-const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: "財報", ETF: "ETF 資料", LAYA: "⚖ 判斷" };
+const PANE_FNS = ["GP", "GIP", "DES", "N", "FA", "ETF", "LAYA", "KIT"];
+const STOCK_FNS = ["GP", "GIP", "DES", "N", "FA", "LAYA", "KIT"];
+const ETF_FNS = ["GP", "GIP", "ETF", "N", "LAYA", "KIT"];
+const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: "財報", ETF: "ETF 資料", LAYA: "⚖ 判斷", KIT: "🧰 工具箱" };
+const KIT_TABS = [["tech", "技術面"], ["options", "選擇權"], ["research", "評等籌碼"], ["earnings", "財報季"], ["value", "價值檢查"], ["intel", "市場情報"]];
+const KIT_WORD = { "技術": "tech", "技術面": "tech", "技術分析": "tech", "選擇權": "options", "期權": "options", "評等": "research", "籌碼": "research", "目標價": "research", "法人": "research", "財報季": "earnings", "EPS": "earnings", "法說": "earnings", "價值": "value", "價值投資": "value", "情報": "intel", "類股輪動": "intel", "市場情報": "intel", "工具箱": "tech" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
 const MON_TITLE = { TWFX: "台幣匯率", MACRO: "美國總經（FRED）", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
 const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
@@ -226,6 +228,15 @@ async function run(raw) {
   if (!t.length) return;
   let target = S.focus;
   if (/^[1-4]$/.test(t[0]) && t.length > 1) { target = +t[0] - 1; t = t.slice(1); }
+  // 工具箱：「技術 2330」「NVDA 選擇權」「情報」
+  const kw = KIT_WORD[t[0]] || KIT_WORD[t[0].toUpperCase()] || (t.length > 1 && (KIT_WORD[t[t.length - 1]] || KIT_WORD[t[t.length - 1].toUpperCase()]));
+  if (kw) {
+    if (kw === "intel") return setPane(target, { fn: "KIT", kit: "intel", sec: S.panes[target].sec || "2330.TW" });
+    const words = KIT_WORD[t[0]] || KIT_WORD[t[0].toUpperCase()] ? t.slice(1) : t.slice(0, -1);
+    const sec = words.length ? await resolveSec(words.join(" ")) : (S.panes[target].sec || "2330.TW");
+    if (!sec) { flash(`找不到「${words.join(" ")}」`); return; }
+    return setPane(target, { fn: "KIT", kit: kw, sec });
+  }
   const head = alias(t[0]);
   const tail = t.slice(1);
 
@@ -349,7 +360,7 @@ function renderPane(i) {
     fns.append(h("button", { title: "TradingAgents 多代理人分析", onclick: (e) => { e.stopPropagation(); openSide("tradingagents"); prefillEngine("tradingagents", p.sec); } }, "AI▸"));
   }
   fns.append(h("button", { title: "最大化", onclick: (e) => { e.stopPropagation(); toggleMax(i); } }, "⤢"));
-  const R = { TWFX: renderTWFX, MACRO: renderMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
+  const R = { KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
               ETFM: renderETFMon, FUNDS: renderFundSearch, FUNDD: renderFund, WORLD: renderWorld, LAYA: renderLaya, LAB: renderLab, DATA: renderData };
   if (R[p.fn]) R[p.fn](i, body, p);
   else if (MON_FNS.includes(p.fn)) renderMon(i, body, p);
@@ -357,7 +368,7 @@ function renderPane(i) {
   if (usesSec) loadName(i, p.sec);
 }
 
-function fnLabel(f) { return { GP: "價格走勢", GIP: "盤中走勢", DES: "公司概況", N: "新聞", FA: "財務報表", ETF: "ETF 資料", LAYA: "Laya 交易判斷" }[f] || f; }
+function fnLabel(f) { return { GP: "價格走勢", GIP: "盤中走勢", DES: "公司概況", N: "新聞", FA: "財務報表", ETF: "ETF 資料", LAYA: "Laya 交易判斷", KIT: "分析工具箱" }[f] || f; }
 
 async function loadName(i, sec) {
   try {
@@ -922,6 +933,7 @@ async function overlayMajor(i, sec, rows) {
     if (e.kind === "move") mk.push({ time: t, position: e.dir > 0 ? "belowBar" : "aboveBar", color: e.dir > 0 ? UP : DN, shape: e.dir > 0 ? "arrowUp" : "arrowDown", text: short });
     else if (e.kind === "fomc") mk.push({ time: t, position: "belowBar", color: "#b48cff", shape: "square", text: "Fed" });
     else if (e.kind === "cbc") mk.push({ time: t, position: "belowBar", color: "#3ad6d6", shape: "square", text: "央行" });
+    else if (e.kind === "macro") mk.push({ time: t, position: "belowBar", color: "#ff9f43", shape: "square", text: /CPI/.test(e.title) ? "CPI" : /非農/.test(e.title) ? "非農" : "PCE" });
     else if (e.kind === "history") mk.push({ time: t, position: e.dir > 0 ? "belowBar" : "aboveBar", color: "#e6e6e6", shape: "circle", text: short });
     else mk.push({ time: t, position: "aboveBar", color: "#ffd166", shape: "circle", text: short });
   }
@@ -2561,6 +2573,31 @@ function holdView(i, body, d, dd) {
   body.append(dcaSection(i, dd));
 }
 
+/* ---------- 分析工具箱（技術／選擇權／評等籌碼／財報季／價值／市場情報） */
+async function renderKit(i, body, p) {
+  const tab = p.kit || "tech";
+  body.classList.add("kit-body");
+  const bar = h("div", { class: "ranges" }, ...KIT_TABS.map(([k, l]) => h("button", { class: tab === k ? "on" : "", onclick: () => setPane(i, { kit: k }) }, l)),
+    h("span", { class: "grow" }),
+    h("button", { title: "把這份資料交給本機 Ollama 解讀", onclick: () => { const txt = S.kitText && S.kitText[i]; if (txt) { setFocus(i); askSend(`根據下面的資料，用重點條列解讀現在的狀況與要注意的風險（不要給買賣建議）：\n\n${txt}`); } } }, "問 AI 解讀 ▸"));
+  const holder = h("div", { class: "kit-out" }, h("div", { class: "loading" }, "計算中"));
+  body.append(bar, holder);
+  let d;
+  try {
+    const q = tab === "intel" ? "/api/kit/intel?market=all" : `/api/kit/${tab}?s=${encodeURIComponent(p.sec)}${p.kitExp ? `&expiry=${p.kitExp}` : ""}`;
+    d = await api(q);
+  } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  const cur = S.panes[i];
+  if (cur.fn !== "KIT" || (cur.kit || "tech") !== tab || (tab !== "intel" && cur.sec !== p.sec)) return;
+  (S.kitText = S.kitText || {})[i] = d.text;
+  holder.innerHTML = `<div class="md">${md(d.text)}</div>`;
+  if (tab === "options" && d.data && d.data.expiries) {
+    const sel = h("select", {}, ...d.data.expiries.slice(0, 16).map((e) => h("option", { value: e, ...(e === d.data.expiry ? { selected: "" } : {}) }, e)));
+    sel.addEventListener("change", () => setPane(i, { kitExp: sel.value }));
+    holder.prepend(h("div", { class: "kit-exp" }, h("span", { class: "muted" }, "到期日 "), sel));
+  }
+}
+
 /* ---------- 側欄：定期定額回測＋AI 評估 */
 const DCA_DEF = () => ({ symbols: S.panes[S.focus] && S.panes[S.focus].sec ? S.panes[S.focus].sec : "0050, VOO, BTC-USD", amount: 5000, freq: "monthly", days: "6",
   start: (() => { const d = new Date(); d.setFullYear(d.getFullYear() - 5); return d.toLocaleDateString("sv-SE"); })(), end: "", fee_pct: 0.1425 });
@@ -2867,7 +2904,7 @@ function holdPrompt(d) {
 
 
 /* ---------- 重大事件 */
-const EV_KIND_STYLE = { move: "ev-move", history: "ev-hist", fomc: "ev-fomc", cbc: "ev-cbc", manual: "ev-manual", world: "ev-world" };
+const EV_KIND_STYLE = { move: "ev-move", history: "ev-hist", fomc: "ev-fomc", cbc: "ev-cbc", macro: "ev-macro", manual: "ev-manual", world: "ev-world" };
 const WEEKDAY = "日一二三四五六";
 
 async function renderEvents(i, body, p) {
@@ -2875,7 +2912,7 @@ async function renderEvents(i, body, p) {
   const kind = p.evKind || "";
   const days = p.evDays || 365;
   const bar = h("div", { class: "ranges" });
-  [["", "全部"], ["history", "歷史大事"], ["move", "指數大波動"], ["fomc", "Fed 決策"], ["cbc", "台灣央行"], ["manual", "自訂"], ["world", "世界事件"]].forEach(([k, l]) =>
+  [["", "全部"], ["history", "歷史大事"], ["move", "指數大波動"], ["fomc", "Fed 決策"], ["cbc", "台灣央行"], ["macro", "美國數據"], ["manual", "自訂"], ["world", "世界事件"]].forEach(([k, l]) =>
     bar.append(h("button", { class: kind === k ? "on" : "", onclick: () => setPane(i, { evKind: k }) }, l)));
   bar.append(h("span", { class: "sep-s" }));
   [[183, "半年"], [365, "1 年"], [730, "2 年"], [1826, "5 年"], [3653, "10 年"]].forEach(([d, l]) =>
@@ -2953,8 +2990,16 @@ function evCard(i, e, p) {
   } else if (["move", "fomc", "cbc", "history"].includes(e.kind) && !e.news_at) main.append(h("div", { class: "muted ev-sum" }, "新聞與 AI 摘要在背景整理中…"));
   if (!e.readonly) {
     const acts = h("div", { class: "ev-acts" });
-    const idx = mv.length ? mv[0][0] : e.kind === "cbc" ? "TWD=X" : "^TWII";
+    const idx = mv.length ? mv[0][0] : e.kind === "cbc" ? "TWD=X" : e.kind === "macro" || e.kind === "fomc" ? "^GSPC" : "^TWII";
     acts.append(h("button", { class: "mini", onclick: () => evOpenChart(i, idx, e.date) }, "看走勢"));
+    if (e.kind === "fomc") {
+      const box = h("div", { class: "fomc-box hidden" });
+      acts.append(h("button", { class: "mini", title: "聲明稿措辭變化、AI 解讀、經濟預測（SEP）、會議紀要", onclick: () => {
+        box.classList.toggle("hidden");
+        if (!box.dataset.loaded) { box.dataset.loaded = "1"; fomcDocs(box, e.date); }
+      } }, "📄 聲明／紀要／預測"));
+      main.append(box);
+    }
     if (["move", "fomc", "cbc", "history"].includes(e.kind))
       acts.append(h("button", { class: "mini", title: "重抓當時新聞，讓本機 Ollama 重新命名（你改過的標題不會被覆蓋）", onclick: async (ev) => {
         ev.target.disabled = true; ev.target.textContent = "AI 撰寫中…";
@@ -2970,6 +3015,66 @@ function evCard(i, e, p) {
   }
   card.append(main);
   return card;
+}
+
+/* ---------- FOMC 文件 */
+const sepFmt = (v) => (v == null ? "—" : Number(v).toFixed(1));
+
+function sepTable(sep, labels) {
+  const t = h("table", { class: "grid sep-tbl" });
+  t.innerHTML = `<thead><tr><th>中位數（%）</th>${sep.years.map((y) => `<th>${y === "Longer run" ? "長期" : y}</th>`).join("")}</tr></thead>`;
+  const tb = h("tbody");
+  for (const [k, zh] of Object.entries(labels)) {
+    const m = sep.median[k]; if (!m) continue;
+    const pv = (sep.previous || {})[k] || [];
+    tb.append(h("tr", {}, h("td", { class: "nm" }, zh), ...m.map((v, j) => {
+      const d = v != null && pv[j] != null ? v - pv[j] : null;
+      return h("td", { title: pv[j] != null ? `前次 ${sepFmt(pv[j])}` : "" }, sepFmt(v),
+        d ? h("small", { class: d > 0 ? "up" : "down" }, ` ${d > 0 ? "▲" : "▼"}${Math.abs(d).toFixed(1)}`) : null);
+    })));
+  }
+  t.append(tb);
+  return t;
+}
+
+async function fomcDocs(box, day) {
+  box.innerHTML = `<div class="loading">讀取 federalreserve.gov 文件</div>`;
+  let d;
+  try { d = await api(`/api/fomc/${day}`); } catch (e) { box.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  box.innerHTML = "";
+  if (d.upcoming || !d.statement) { box.append(h("div", { class: "muted" }, d.upcoming ? "會議還沒開；聲明在決策日美東 14:00（台灣隔天凌晨 2:00，夏令 3:00）發布。" : "聲明稿暫時抓不到，稍後再試。")); return; }
+  const aiBox = (kind, label) => {
+    const out = h("div", { class: "fomc-ai" });
+    const n = d.notes && d.notes[kind];
+    if (n) out.innerHTML = `<div class="md">${md(n.text)}</div><div class="muted">${esc(n.model || "")}・${esc((n.at || "").replace("T", " "))}</div>`;
+    const b = h("button", { class: "mini", onclick: async () => {
+      b.disabled = true; b.textContent = "本機 Ollama 撰寫中…";
+      try { const r = await api(`/api/fomc/${day}/ai?kind=${kind}&force=${n ? "true" : "false"}`, { method: "POST" }); out.innerHTML = `<div class="md">${md(r.text)}</div>`; }
+      catch (x) { out.innerHTML = `<div class="errbox">${esc(x.message)}</div>`; }
+      b.disabled = false; b.textContent = label;
+    } }, n ? "重寫 " + label : label);
+    return h("div", {}, b, out);
+  };
+  // statement diff
+  const sec1 = h("section", { class: "fomc-sec" }, h("h5", {}, "聲明稿",
+    h("a", { href: d.statement.url, target: "_blank", rel: "noopener noreferrer", class: "muted" }, "　原文 ↗"),
+    h("span", { class: "muted" }, d.previous_date ? `　相對 ${d.previous_date}：${d.changes} 處變化（綠＝新增、紅刪除線＝刪除）` : "")));
+  const body = h("div", { class: "fomc-diff" });
+  for (const x of d.diff || d.statement.text.split("\n\n").map((t) => ({ op: "same", text: t })))
+    body.append(h("span", { class: `fd-${x.op}` }, x.text + " "));
+  sec1.append(body, aiBox("statement", "🤖 AI 解讀措辭變化"));
+  box.append(sec1);
+  if (d.sep) {
+    box.append(h("section", { class: "fomc-sec" }, h("h5", {}, "經濟預測摘要（SEP）",
+      h("a", { href: d.sep.url, target: "_blank", rel: "noopener noreferrer", class: "muted" }, "　原文 ↗"),
+      h("span", { class: "muted" }, d.previous_sep_date ? `　▲▼ 相對 ${d.previous_sep_date}` : "")), sepTable(d.sep, d.labels)));
+  }
+  const sec3 = h("section", { class: "fomc-sec" }, h("h5", {}, "會議紀要"));
+  if (d.minutes) {
+    sec3.append(h("div", { class: "muted" }, h("a", { href: d.minutes.url, target: "_blank", rel: "noopener noreferrer" }, "原文 ↗"), `　約 ${nf(d.minutes.chars / 1000, 0)}k 字元`),
+      aiBox("minutes", "🤖 AI 摘要紀要"));
+  } else sec3.append(h("div", { class: "muted" }, `會後約三週發布（預計 ${d.minutes_due} 前後），背景會自動抓。`));
+  box.append(sec3);
 }
 
 function evNewsLi(n) {
@@ -3147,6 +3252,13 @@ async function renderMacro(i, body, p) {
   try { d = await api("/api/macro"); } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
   if (S.panes[i].fn !== "MACRO") return;
   holder.innerHTML = "";
+  const sepBox = h("section", { class: "fomc-sec mc-sep" });
+  holder.append(sepBox);
+  api("/api/fomc/sep/latest").then((sep) => {
+    sepBox.append(h("h5", {}, `Fed 經濟預測中位數（SEP ${sep.date}）`,
+      h("a", { href: sep.url, target: "_blank", rel: "noopener noreferrer", class: "muted" }, "　原文 ↗"),
+      h("span", { class: "muted" }, "　▲▼ 相對前一次預測；聲明措辭變化看「大事」頁的 Fed 事件")), sepTable(sep, sep.labels));
+  }).catch(() => sepBox.remove());
   const bad = d.rows.filter((r) => r.error);
   if (bad.length) {  // one explanation at the top instead of the same long message on every row
     const why = bad[0].error.replace(/（10 分鐘內不重試）/, "");
@@ -3326,6 +3438,7 @@ async function fxMarkers(i, chart, series, box, code, rng, pts, legend) {
     const more = es.length > 1 ? ` +${es.length - 1}` : "";
     if (e.kind === "fxmove") mk.push({ time: t, position: e.dir > 0 ? "aboveBar" : "belowBar", color: e.dir > 0 ? UP : DN, shape: e.dir > 0 ? "arrowUp" : "arrowDown", text: clip(e.title, 9) + more });
     else if (e.kind === "cbc") mk.push({ time: t, position: "belowBar", color: "#3ad6d6", shape: "square", text: "央行" + more });
+    else if (e.kind === "macro") mk.push({ time: t, position: "belowBar", color: "#ff9f43", shape: "square", text: (/CPI/.test(e.title) ? "CPI" : /非農/.test(e.title) ? "非農" : "PCE") + more });
     else if (e.kind === "fomc") mk.push({ time: t, position: "belowBar", color: "#b48cff", shape: "square", text: "Fed" + more });
     else mk.push({ time: t, position: "aboveBar", color: e.kind === "history" ? "#e6e6e6" : "#ffd166", shape: "circle", text: e.label ? clip(e.title.replace(/（.*?）/g, ""), 7) + more : "" });
   }

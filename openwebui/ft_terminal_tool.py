@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.11.0
+version: 0.13.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -186,6 +186,94 @@ class Tools:
         """
         await self._status(__event_emitter__, "台幣匯率")
         out = await self._get("twfx", {"q": currencies}, timeout=120)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def technical_analysis(self, symbol: str, __event_emitter__: Emitter = None) -> str:
+        """
+        技術面：均線、RSI、KD、MACD、布林通道、ATR、一目均衡表、K 線型態（十字線、錘子、吞噬、晨星／夜星）、支撐壓力與規則化訊號。
+        :param symbol: 標的：代號或中文名，例 2330、台積電、NVDA
+        :return: Markdown 文字
+        """
+        await self._status(__event_emitter__, "技術面")
+        out = await self._get("kit/tech", {"q": symbol}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def options_chain(self, symbol: str, __event_emitter__: Emitter = None) -> str:
+        """
+        美股／美國 ETF 選擇權：最近到期鏈（ATM±5 檔）、IV、Delta／Theta（Black-Scholes）、未平倉、Put/Call 比、max pain、隱含波動區間。
+        :param symbol: 美股代號，例 NVDA、SPY
+        :return: Markdown 文字
+        """
+        await self._status(__event_emitter__, "美股／美國 ETF 選擇權")
+        out = await self._get("kit/options", {"q": symbol}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def analyst_research(self, symbol: str, __event_emitter__: Emitter = None) -> str:
+        """
+        研究與籌碼：分析師評等分布、目標價、最近升降評、內部人交易、機構持股；台股另有三大法人、融資券、本益比與殖利率。
+        :param symbol: 標的，例 2330、AAPL
+        :return: Markdown 文字
+        """
+        await self._status(__event_emitter__, "研究與籌碼")
+        out = await self._get("kit/research", {"q": symbol}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def earnings_review(self, symbol: str, __event_emitter__: Emitter = None) -> str:
+        """
+        財報季：下次財報日、近 8 季 EPS 預估 vs 實際、驚喜幅度與財報後隔日／5 日股價反應；台股另有月營收與累計 EPS、毛利率。
+        :param symbol: 標的，例 AAPL、2330
+        :return: Markdown 文字
+        """
+        await self._status(__event_emitter__, "財報季")
+        out = await self._get("kit/earnings", {"q": symbol}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def value_investing(self, symbol: str, __event_emitter__: Emitter = None) -> str:
+        """
+        價值投資檢查：Graham 數、NCAV（net-net）、Piotroski F-score 九項、ROE 與毛利率穩定度、自由現金流殖利率、護城河量化跡象。
+        :param symbol: 個股代號，例 KO、2330
+        :return: Markdown 文字
+        """
+        await self._status(__event_emitter__, "價值投資檢查")
+        out = await self._get("kit/value", {"q": symbol}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def market_intel(self, market: str = "all", __event_emitter__: Emitter = None) -> str:
+        """
+        市場情報：美股 11 個類股 ETF 輪動（1 週／1 月／3 月／1 年）、台股與美股權值股今日強弱、1 個月動能、爆量與站上 200 日線比例（市場廣度）。
+        :param market: all、tw 或 us
+        :return: Markdown 文字
+        """
+        await self._status(__event_emitter__, "市場情報")
+        out = await self._get("kit/intel", {"market": market}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def fomc_documents(self, date: str = "", __event_emitter__: Emitter = None) -> str:
+        """
+        Fed 利率會議（FOMC）官方文件：聲明稿相對上次的逐句措辭變化、本機 AI 解讀、經濟預測摘要（SEP 中位數：GDP、失業率、PCE、聯邦基金利率，含前次比較）、會議紀要摘要。
+        :param date: 會議決策日 YYYY-MM-DD；空白＝最近一次
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, "FOMC 文件")
+        out = await self._get("fomc", {"date": date}, timeout=180)
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def economic_calendar(self, days: int = 21, __event_emitter__: Emitter = None) -> str:
+        """
+        接下來的重要日程：Fed 利率決策、台灣央行理監事會、美國 CPI／非農就業／PCE 公布日。
+        :param days: 往後幾天（1–120）
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, "重要日程")
+        out = await self._get("calendar", {"days": days}, timeout=60)
         await self._status(__event_emitter__, "完成", True)
         return out
 

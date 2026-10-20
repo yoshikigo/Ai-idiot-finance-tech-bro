@@ -11,12 +11,12 @@ from pathlib import Path
 
 import httpx
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from ft_common import context, dca, edgar, events, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmarket, world
+from ft_common import context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, supplychain, twmarket, world
 
 DATA = Path(os.environ.get("FT_DATA", "/data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -457,9 +457,20 @@ async def api_ask(req: Request):
                 parts.append(await run_in_threadpool(edgar.filings_text, t, 8))
             except Exception:  # noqa: BLE001
                 pass
+    if any(k in last_q for k in ("技術", "均線", "KD", "RSI", "MACD", "布林", "支撐", "壓力", "型態", "一目")):
+        for tt in targets[:2]:
+            try:
+                parts.append("【技術面（本機計算）】\n" + (await run_in_threadpool(toolkit.technical, tt))["text"])
+            except Exception:  # noqa: BLE001
+                pass
     if any(k in last_q for k in ("匯率", "台幣", "新台幣", "美元", "日圓", "日幣", "人民幣", "歐元", "韓元", "換匯", "升值", "貶值")):
         try:
             parts.append(await run_in_threadpool(fx.text, None))
+        except Exception:  # noqa: BLE001
+            pass
+    if any(k in last_q for k in ("Fed", "FOMC", "聯準會", "鮑爾", "點陣圖", "會議紀要", "利率決策")):
+        try:
+            parts.append(await run_in_threadpool(fomc.text, None))
         except Exception:  # noqa: BLE001
             pass
     if any(k in last_q for k in ("大跌", "大漲", "暴跌", "崩盤", "重挫", "大事", "重大事件", "為什麼", "Fed", "聯準會", "降息", "升息")):
@@ -725,6 +736,40 @@ async def api_event_ai(eid: str, req: Request):
     return events._public(e)  # noqa: SLF001
 
 
+# ------------------------------------------------------------------ FOMC 文件（聲明、紀要、SEP）
+@app.get("/api/fomc/sep/latest")
+async def api_fomc_sep():
+    sep = await run_in_threadpool(fomc.latest_sep)
+    if not sep:
+        raise HTTPException(404, "還沒有經濟預測資料")
+    sep["labels"] = {k: zh for _, k, zh in fomc.VARS}
+    return sep
+
+
+@app.get("/api/fomc/{day}")
+async def api_fomc(day: str):
+    try:
+        b = await run_in_threadpool(fomc.bundle, day)
+    except KeyError:
+        raise HTTPException(404, "不是 FOMC 會議日")
+    except Exception as e:  # noqa: BLE001
+        _err(e)
+    b["labels"] = {k: zh for _, k, zh in fomc.VARS}
+    return b
+
+
+@app.post("/api/fomc/{day}/ai")
+async def api_fomc_ai(day: str, req: Request, kind: str = "statement", force: bool = False):
+    _ev_body_check(req)
+    if kind not in ("statement", "minutes"):
+        raise HTTPException(400, "kind 只能是 statement 或 minutes")
+    llm = ollama.resolve(llm_block(load_settings()), "ask")
+    try:
+        return await run_in_threadpool(fomc.ai, day, kind, llm, force)
+    except (ValueError, KeyError) as e:
+        raise HTTPException(422, str(e)) from e
+
+
 # ------------------------------------------------------------------ SEC EDGAR + FRED
 @app.get("/api/sec/financials")
 def api_sec_financials(s: str, freq: str = "annual"):
@@ -785,6 +830,20 @@ def api_twfx_events(ccy: str, range: str = "1y"):  # noqa: A002
             "summary": f"單日 {name}兌台幣 {m['pct']:+.2f}%，約 {m['sigma']} 倍近 60 日波動"} for m in mv if m["date"] >= since]
     out += events.markers(since, None, f"TWFX:{code}")
     return sorted(out, key=lambda e: e["date"])
+
+
+# ------------------------------------------------------------------ 分析工具箱（技術／選擇權／研究／財報／價值／情報）
+@app.get("/api/kit/{kind}")
+def api_kit(kind: str, s: str = "", expiry: str = "", market_: str = Query("all", alias="market")):
+    sym = "" if kind == "intel" else (s if s.upper().startswith("FUND:") else (context.resolve(s) or s.upper()))
+    try:
+        return toolkit.run(kind, sym, expiry=expiry, market=market_)
+    except KeyError:
+        raise HTTPException(404, "沒有這個工具")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    except Exception as e:  # noqa: BLE001
+        _err(e)
 
 
 # ------------------------------------------------------------------ 定期定額回測
@@ -996,6 +1055,17 @@ def _warm():
     if os.environ.get("FT_LEDGER", "1") != "0":
         threading.Thread(target=ledger.loop_forever, args=(lambda: ollama.resolve(llm_block(load_settings()), "ask"),),
                          daemon=True).start()
+    if os.environ.get("FT_FOMC", "1") != "0":
+        def _fomc_loop():
+            import time as _t
+            _t.sleep(300)
+            while True:
+                try:
+                    fomc.sync()
+                except Exception as e:  # noqa: BLE001
+                    print("fomc sync failed:", e)
+                _t.sleep(3 * 3600)
+        threading.Thread(target=_fomc_loop, daemon=True).start()
     if os.environ.get("FT_EVENTS", "1") != "0":
         threading.Thread(target=events.loop_forever, args=(lambda: ollama.resolve(llm_block(load_settings()), "ask"),),
                          daemon=True).start()

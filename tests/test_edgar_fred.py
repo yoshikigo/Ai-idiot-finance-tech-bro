@@ -121,6 +121,7 @@ def test_fomc_events_get_the_actual_decision(tmp_path, monkeypatch):
     from ft_common import events, fred
     monkeypatch.setattr(events, "load_closes", lambda period: {})
     monkeypatch.setattr(events, "HISTORY", [])
+    monkeypatch.setattr(events, "USREL", [])
     monkeypatch.setattr(events, "FOMC", ["2026-09-16", "2099-12-09"])
     monkeypatch.setattr(fred, "fed_decision", lambda d: {"bp": -25, "upper": 4.25, "lower": 4.0, "before_upper": 4.5,
                                                          "before_lower": 4.25, "title": "Fed 降息 1 碼（4.00%–4.25%）"})

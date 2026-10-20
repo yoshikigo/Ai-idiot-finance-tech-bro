@@ -36,8 +36,59 @@ FOMC = ["2025-01-29", "2025-03-19", "2025-05-07", "2025-06-18", "2025-07-30", "2
 # 台灣央行理監事聯席會議（每季，週四）。2025-12-18、2026-06-18、2026-09-17 經新聞／央行新聞稿確認；
 # 其他依往例（每季第 3 個週四）推估——不對的話在「大事」頁改日期即可（使用者修改不會被覆蓋）。
 CBC = ["2025-03-20", "2025-06-19", "2025-09-18", "2025-12-18", "2026-03-19", "2026-06-18", "2026-09-17", "2026-12-17"]
-KINDS = {"move": "市場大波動", "history": "歷史大事", "fomc": "Fed 利率決策", "cbc": "台灣央行理監事會", "manual": "自訂",
-         "world": "世界事件"}
+# 美國重要數據公布日（美東 8:30，台灣時間當晚 20:30／夏令 21:30）：(公布日, 種類, 參考月份)
+# 2026 年全年與 2025 年政府停擺後的改期依 BLS／BEA 公告查證；2025 年 1–9 月 CPI 依當時慣例日期（未逐一查證，可在大事頁修改）。
+USREL = (
+    [(d, "cpi", m) for d, m in [
+        ("2025-01-15", "2024-12"), ("2025-02-12", "2025-01"), ("2025-03-12", "2025-02"), ("2025-04-10", "2025-03"),
+        ("2025-05-13", "2025-04"), ("2025-06-11", "2025-05"), ("2025-07-15", "2025-06"), ("2025-08-12", "2025-07"),
+        ("2025-09-11", "2025-08"), ("2025-10-24", "2025-09"), ("2025-12-18", "2025-11"),  # 10 月份因停擺取消
+        ("2026-01-13", "2025-12"), ("2026-02-13", "2026-01"), ("2026-03-11", "2026-02"), ("2026-04-10", "2026-03"),
+        ("2026-05-12", "2026-04"), ("2026-06-10", "2026-05"), ("2026-07-14", "2026-06"), ("2026-08-12", "2026-07"),
+        ("2026-09-11", "2026-08"), ("2026-10-14", "2026-09"), ("2026-11-10", "2026-10"), ("2026-12-10", "2026-11")]]
+    + [(d, "nfp", m) for d, m in [
+        ("2025-01-10", "2024-12"), ("2025-02-07", "2025-01"), ("2025-03-07", "2025-02"), ("2025-04-04", "2025-03"),
+        ("2025-05-02", "2025-04"), ("2025-06-06", "2025-05"), ("2025-07-03", "2025-06"), ("2025-08-01", "2025-07"),
+        ("2025-09-05", "2025-08"), ("2025-11-20", "2025-09"), ("2025-12-16", "2025-11"),  # 10 月份因停擺取消
+        ("2026-01-09", "2025-12"), ("2026-02-11", "2026-01"), ("2026-03-06", "2026-02"), ("2026-04-03", "2026-03"),
+        ("2026-05-08", "2026-04"), ("2026-06-05", "2026-05"), ("2026-07-02", "2026-06"), ("2026-08-07", "2026-07"),
+        ("2026-09-04", "2026-08"), ("2026-10-02", "2026-09"), ("2026-11-06", "2026-10"), ("2026-12-04", "2026-11")]]
+    + [(d, "pce", m) for d, m in [
+        ("2026-02-20", "2025-12"), ("2026-03-13", "2026-01"), ("2026-04-09", "2026-02"), ("2026-04-30", "2026-03"),
+        ("2026-05-28", "2026-04"), ("2026-06-25", "2026-05"), ("2026-07-30", "2026-06"), ("2026-08-26", "2026-07"),
+        ("2026-09-30", "2026-08"), ("2026-10-29", "2026-09"), ("2026-11-25", "2026-10"), ("2026-12-23", "2026-11")]]
+)
+USREL_NAME = {"cpi": "美國 CPI", "nfp": "美國非農就業", "pce": "美國 PCE 物價"}
+KINDS = {"move": "市場大波動", "history": "歷史大事", "fomc": "Fed 利率決策", "cbc": "台灣央行理監事會", "macro": "美國數據公布",
+         "manual": "自訂", "world": "世界事件"}
+
+
+def macro_actual(kind: str, ref: str) -> str | None:
+    """What the release said, from FRED (after it's out): CPI / core CPI y/y, payrolls / unemployment, PCE / core PCE y/y."""
+    import pandas as pd
+
+    from . import fred
+    m = pd.Timestamp(ref + "-01")
+
+    def at(sid):
+        s = fred.transformed(sid)
+        if m not in s.index:
+            return None, None
+        k = s.index.get_loc(m)
+        return float(s.iloc[k]), (float(s.iloc[k - 1]) if k else None)
+    try:
+        if kind == "cpi":
+            (a, pa), (b, pb) = at("CPIAUCSL"), at("CPILFESL")
+            return None if a is None else f"CPI 年增 {a:.1f}%（前月 {pa:.1f}%）" + (f"、核心 {b:.1f}%（前月 {pb:.1f}%）" if b is not None else "")
+        if kind == "nfp":
+            (a, pa), (u, pu) = at("PAYEMS"), at("UNRATE")
+            return None if a is None else f"非農新增 {a:+,.0f} 千人（前月 {pa:+,.0f}）" + (f"、失業率 {u:.1f}%（前月 {pu:.1f}%）" if u is not None else "")
+        if kind == "pce":
+            b, pb = at("PCEPILFE")
+            return None if b is None else f"核心 PCE 年增 {b:.1f}%（前月 {pb:.1f}%）"
+    except Exception:  # noqa: BLE001
+        return None
+    return None
 
 # Well-documented market-moving events since 2020 (built-in list; dates are the day markets reacted).
 # Later events come from detection + headlines. Edit freely — user edits in the UI are never overwritten.
@@ -218,6 +269,11 @@ def refresh(period: str | None = None) -> dict:
                 fd = None
             if fd:
                 fed[d] = fd
+    today_s = dt.date.today().isoformat()
+    actual = {}
+    for d, k, ref in USREL:  # released figures (FRED), fetched before taking the DB lock
+        if d <= today_s and os.environ.get("FT_EVENTS_MACRO", "1") != "0":
+            actual[(d, k)] = macro_actual(k, ref)
     with _lock, _conn() as c:
         for e in found:
             h = near_hist(e)
@@ -268,6 +324,13 @@ def refresh(period: str | None = None) -> dict:
         for d in CBC:
             c.execute("INSERT OR IGNORE INTO events(id,date,kind,auto_title,created,updated) VALUES(?,?,?,?,?,?)",
                       (f"cbc:{d}", d, "cbc", "台灣央行理監事會", now, now))
+        for d, k, ref in USREL:
+            eid = f"macro:{k}:{d}"
+            title = f"{USREL_NAME[k]}（{int(ref[5:])} 月）"
+            c.execute("INSERT OR IGNORE INTO events(id,date,kind,auto_title,auto_summary,created,updated) VALUES(?,?,?,?,?,?,?)",
+                      (eid, d, "macro", title, "美東 8:30 公布（台灣時間 20:30，夏令 21:30）", now, now))
+            if actual.get((d, k)):
+                c.execute("UPDATE events SET auto_summary=? WHERE id=?", (actual[(d, k)] + "（FRED）", eid))
     return {"detected": len(found), "history": len(HISTORY), "period": period,
             "since": min((str(v.index[0]) for v in closes.values()), default=None), "at": now}
 
@@ -402,7 +465,8 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
     the rest are drawn as bare arrows so a volatile year stays readable."""
     fx = symbol.startswith("TWFX:")  # currency charts: central banks + history; index moves don't belong there
     rows = list_events(since, until or dt.date.today().isoformat(),
-                       ["history", "fomc", "cbc", "manual"] if fx else ["move", "history", "fomc", "cbc", "manual"], world_too=False)
+                       ["history", "fomc", "cbc", "macro", "manual"] if fx else ["move", "history", "fomc", "cbc", "macro", "manual"],
+                       world_too=False)
     years = max(1.0, (dt.date.fromisoformat((until or dt.date.today().isoformat())[:10]) - dt.date.fromisoformat(since[:10])).days / 365)
     moves = [e for e in rows if e["kind"] == "move"]
     if symbol in INDEXES:
@@ -412,6 +476,9 @@ def markers(since: str, until: str | None = None, symbol: str = "", top: int = 1
         moves = sorted(moves, key=lambda e: -e["score"])[:int(top * min(years, 3))]
     if years > 3:  # long charts: Fed / central-bank days would bury everything else
         rows = [e for e in rows if e["kind"] not in ("fomc", "cbc")]
+    span_days = (dt.date.fromisoformat((until or dt.date.today().isoformat())[:10]) - dt.date.fromisoformat(since[:10])).days
+    if span_days > 400:  # monthly data releases only on charts of a year or less
+        rows = [e for e in rows if e["kind"] != "macro"]
     n_lab = top if years <= 3 else 5  # long charts: built-in history events carry the labels
     strong = {e["id"] for e in sorted(moves, key=lambda e: -(e["moves"].get(symbol, {}).get("pct", 0) ** 2 or e["score"]))[:n_lab]}
     keep = moves + [e for e in rows if e["kind"] != "move"]

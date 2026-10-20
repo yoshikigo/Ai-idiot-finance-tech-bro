@@ -13,7 +13,7 @@ import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 
-from ft_common import context, dca, edgar, events, focus, fred, funds, fx, ledger, notes, supplychain, twmarket, world
+from ft_common import context, dca, edgar, fomc, toolkit, events, focus, fred, funds, fx, ledger, notes, supplychain, twmarket, world
 
 router = APIRouter(prefix="/api/agent")
 _hooks: dict = {}  # set by app.py: settings loader, llm block, engines map
@@ -228,6 +228,43 @@ def twfx_text(q: str = "", plain: bool = False, format: str = "text"):  # noqa: 
     """新台幣匯率：1 外幣 = 多少台幣，日／月／年變動。q 可指定幣別（例：USD,JPY,EUR）。"""
     codes = [c.strip().upper() for c in q.replace("，", ",").split(",") if c.strip().upper() in fx.CCY] or None
     return _out(fx.text(codes), plain, None, format)
+
+
+@router.get("/kit/{kind}")
+def kit_text(kind: str, q: str = "", expiry: str = "", market: str = "all", plain: bool = False, format: str = "text"):  # noqa: A002
+    """分析工具箱：kind = tech（技術面：均線、RSI、KD、MACD、布林、一目均衡表、K 線型態、支撐壓力）、options（美股選擇權鏈、IV、
+    Greeks、Put/Call、max pain）、research（分析師評等／目標價／內部人；台股三大法人與融資券）、earnings（EPS 驚喜與財報後股價反應；
+    台股月營收與財報）、value（Graham 數、NCAV、Piotroski F-score、護城河指標）、intel（美股類股輪動、台美權值股強弱與市場廣度，
+    market=all|tw|us，不需 q）。"""
+    sym = "" if kind == "intel" else (q if q.upper().startswith("FUND:") else (context.resolve(q) or q.upper()))
+    try:
+        r = toolkit.run(kind, sym, expiry=expiry, market=market)
+        return _out(r["text"], plain, None, format)
+    except KeyError:
+        return _out(f"沒有這個工具：{kind}（可用 tech／options／research／earnings／value／intel）", plain, None, format)
+    except Exception as e:  # noqa: BLE001
+        return _out(f"{sym or kind}：{e}", plain, None, format)
+
+
+@router.get("/fomc")
+def fomc_text(date: str = "", plain: bool = False, format: str = "text"):  # noqa: A002
+    """FOMC 會議：聲明稿相對上次的措辭變化（逐句新增／刪除）、AI 解讀、經濟預測中位數（SEP，含前次比較）、會議紀要摘要。
+    date＝會議決策日 YYYY-MM-DD，空白＝最近一次。"""
+    try:
+        return _out(fomc.text(date or None), plain, None, format)
+    except KeyError:
+        return _out(f"{date} 不是 FOMC 會議日", plain, None, format)
+
+
+@router.get("/calendar")
+def calendar_text(days: int = 21, plain: bool = False, format: str = "text"):  # noqa: A002
+    """接下來的重要日程：Fed 利率決策、台灣央行理監事會、美國 CPI／非農／PCE 公布日（含台灣時間）。"""
+    import datetime as _dt
+    t = _dt.date.today()
+    rows = events.list_events(t.isoformat(), (t + _dt.timedelta(days=max(1, min(days, 120)))).isoformat(),
+                              ["fomc", "cbc", "macro"], world_too=False)
+    lines = [f"【接下來 {days} 天重要日程】"] + [f"- {e['date']} {e['title_final']}" for e in sorted(rows, key=lambda e: e["date"])]
+    return _out("\n".join(lines) if rows else "接下來沒有排定的重要日程", plain, None, format)
 
 
 @router.get("/dca")
