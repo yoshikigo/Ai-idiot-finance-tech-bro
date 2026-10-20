@@ -42,6 +42,7 @@ SCHEMA = [
     {"name": "world_covariates", "label": "用世界事件指標當共變量（只限 TimesFM 3.0，需累積 ≥64 個交易日）", "type": "bool", "default": False},
     {"name": "language", "label": "解讀語言", "type": "select", "default": "Traditional Chinese",
      "options": [{"value": "Traditional Chinese", "label": "繁體中文"}, {"value": "English", "label": "English"}]},
+    {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
 _lock = threading.Lock()
@@ -267,6 +268,8 @@ def run(ctx: Ctx) -> dict:
         facts += "\n\n" + world_info["compact"]
         if world_info["backtest_events"]:
             facts += "\n回測期間發生的事件：" + "；".join(f"{e['date']} {e['title']}" for e in world_info["backtest_events"][:6])
+    if llm.get("context"):
+        facts += "\n\n" + llm["context"]
     commentary = ollama.ask(llm, "You explain statistical time-series forecasts to a retail investor. TimesFM is a "
                                  "zero-shot foundation model that only sees past prices — no news, fundamentals or events "
                                  "(unless world covariates are stated as used). "

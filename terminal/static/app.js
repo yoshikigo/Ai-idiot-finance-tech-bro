@@ -435,7 +435,7 @@ function decisionCard(d, compact) {
   card.append(h("div", { class: "dec-sec" }, `${d.horizon} 個交易日後的位置`), hist);
   if (!compact) return card;
   const f = d.facts || {};
-  const used = [].concat(f.timesfm ? [f.timesfm] : [], f.agents || [], (f.world || []).map((x) => "🌐 " + x));
+  const used = [].concat(f.timesfm ? [f.timesfm] : [], f.agents || [], (f.world || []).map((x) => "🌐 " + x), (f.ft || []).map((x) => "📊 " + x));
   if (used.length) card.append(h("details", { class: "dec-in" }, h("summary", {}, `帶入的訊號（${used.length}）`), h("ul", {}, ...used.map((x) => h("li", {}, x)))));
   card.append(h("div", { class: "dec-warn" }, "Laya 是通用決策模型，未用金融資料訓練；百分比是它對這份狀態的信心，不是統計漲跌機率。用「📝 記錄」累積後，Obsidian「AI 預測回顧」會算它的實際命中率。" + (d.model.includes("假模型") ? "（目前是測試用假模型）" : "")));
   return card;

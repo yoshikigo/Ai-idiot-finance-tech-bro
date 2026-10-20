@@ -27,6 +27,7 @@ SCHEMA = [
     {"name": "initial_amount", "label": "初始資金", "type": "int", "default": 1000000},
     {"name": "language", "label": "解讀語言", "type": "select", "default": "Traditional Chinese",
      "options": [{"value": "Traditional Chinese", "label": "繁體中文"}, {"value": "English", "label": "English"}]},
+    {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
 
@@ -141,7 +142,8 @@ def compute(ctx) -> dict:
              "costs). Be concise; markdown.",
         f"演算法 {algo.upper()}，標的 {', '.join(tickers)}，訓練步數 {steps}\n" +
         "\n".join(f"- {a}: RL {b} / 買進持有 {c}" for a, b, c in metrics) +
-        (f"\n最近動作（股數）欄位 {list(last_pos.columns)}：\n{last_pos.to_string()}" if len(last_pos) else ""),
+        (f"\n最近動作（股數）欄位 {list(last_pos.columns)}：\n{last_pos.to_string()}" if len(last_pos) else "")
+        + (("\n\n" + llm["context"]) if llm.get("context") else ""),
         language=lang)
 
     md = (f"# FinRL · {algo.upper()} · {len(tickers)} 檔\n\n樣本外 {trade.date.min()} ~ {trade.date.max()}："

@@ -26,6 +26,7 @@ SCHEMA = [
     {"name": "etf_top", "label": "成分股檔數（ETF 穿透）", "type": "int", "default": 5, "min": 1, "max": 15},
     {"name": "language", "label": "推理語言", "type": "select", "default": "Traditional Chinese",
      "options": [{"value": "Traditional Chinese", "label": "繁體中文"}, {"value": "English", "label": "English"}]},
+    {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
 LABEL = {a["value"]: a["label"] for a in AGENTS}
@@ -41,6 +42,12 @@ class OllamaLLM:
         self.language = language
 
     def complete(self, system: str, user: str) -> str:
+        if self.cfg.get("context"):  # FT 市場背景: macro + events for everyone, plus this ticker's own block
+            system += "\n\n" + self.cfg["context"]
+            for sym, txt in (self.cfg.get("context_by") or {}).items():
+                if sym in user or sym.split(".")[0] in user:
+                    system += "\n\n" + txt
+                    break
         if self.cfg.get("lessons"):
             system += ("\n\nLessons from reviewing this persona's past calls against actual prices "
                        "(avoid repeating these mistakes):\n" + self.cfg["lessons"])
@@ -134,6 +141,8 @@ def run(ctx: Ctx) -> dict:
 
     if llm.get("lessons"):
         ctx.log("帶入過去檢討（分析紀錄頁可關閉）")
+    if llm.get("context"):
+        ctx.log(f"帶入 FT 市場背景：{llm.get('context_parts') or ''}（{len(llm.get('context_by') or {})} 檔個別資料）")
     client = OllamaLLM(llm, lang)
     cache = PromptCache(ctx.dir / "prompt-cache")
     rows, by_ticker = [], {}

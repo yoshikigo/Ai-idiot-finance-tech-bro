@@ -64,6 +64,7 @@ SCHEMA = [
     {"name": "use_timesfm", "label": "加入 TimesFM 預測（只在基準日＝今天時）", "type": "bool", "default": True},
     {"name": "use_world", "label": "加入現實世界事件（God's Eye View）", "type": "bool", "default": True},
     {"name": "use_news", "label": "加入英文新聞標題", "type": "bool", "default": True},
+    {"name": "use_ft", "label": "加入 FT 市場背景（籌碼、月營收、總經、產業強弱、即將公布的事件）", "type": "bool", "default": True},
 ]
 
 
@@ -254,7 +255,8 @@ def headlines(sym: str, n: int = 5) -> list[str]:
     return out
 
 
-def build_state(sym: str, as_of: str, h: int, use_agents=True, use_timesfm=True, use_world=True, use_news=True) -> tuple[dict, dict]:
+def build_state(sym: str, as_of: str, h: int, use_agents=True, use_timesfm=True, use_world=True, use_news=True,
+                use_ft=True) -> tuple[dict, dict]:
     """→ (English state for Laya, facts for the Chinese report)."""
     end = dt.date.fromisoformat(as_of)
     df = market.history(sym, start=(end - dt.timedelta(days=420)).isoformat(), end=(end + dt.timedelta(days=1)).isoformat())
@@ -316,6 +318,14 @@ def build_state(sym: str, as_of: str, h: int, use_agents=True, use_timesfm=True,
         if hl:
             st["recent_headlines"] = hl
             facts["news"] = hl
+    if use_ft:  # FT 市場背景 in English (Laya only reads English); all as of the base date
+        try:
+            from ft_common import brief
+            ft = brief.facts_en(sym, None if as_of == today() else as_of)
+        except Exception:  # noqa: BLE001
+            ft = {}
+        st.update(ft)
+        facts["ft"] = [f"{k}: {v}" for k, v in ft.items()]
     facts["thresholds"] = (small, large)
     return st, facts
 
@@ -390,6 +400,8 @@ def report(d: dict) -> dict:
         md += ["### 帶入的其他 AI 結論", ""] + [f"- {x}" for x in ([f["timesfm"]] if f.get("timesfm") else []) + f.get("agents", [])] + [""]
     if f.get("world"):
         md += ["### 帶入的世界事件（7 天）", ""] + [f"- {x}" for x in f["world"]] + [""]
+    if f.get("ft"):
+        md += ["### 帶入的 FT 市場背景", ""] + [f"- {x}" for x in f["ft"]] + [""]
     md += ["> [!warning] 怎麼看這些百分比",
            "> Laya 是通用的「System 1」決策模型（客服分流、審核、評分這類任務訓練的），**沒有用金融資料訓練**，官方說零樣本表現接近亂猜、"
            "而且偏過度自信。這裡的百分比是它讀完下面這份英文狀態後，對各選項的信心，**不是**統計上的漲跌機率。"
@@ -420,7 +432,8 @@ def run(ctx: Ctx) -> dict:
         SC.load()
     ctx.step(30, "整理狀態（價格、技術指標、其他引擎、世界事件、新聞）")
     d = decide(sym, as_of, h, use_agents=bool(p.get("use_agents", True)), use_timesfm=bool(p.get("use_timesfm", True)),
-               use_world=bool(p.get("use_world", True)), use_news=bool(p.get("use_news", True)))
+               use_world=bool(p.get("use_world", True)), use_news=bool(p.get("use_news", True)),
+               use_ft=bool(p.get("use_ft", True)))
     ctx.log("state: " + json.dumps(d["state"], ensure_ascii=False))
     ctx.log(f"answers: action={d['action']['probabilities']} p_up={d['p_up']} p_drop={d['p_drop']} ({d['ms']} ms, {d['tokens']} tokens)")
     return report(d)
@@ -442,7 +455,7 @@ def status():
 
 @app.get("/decide")
 def decide_api(symbol: str, horizon: int = 20, date: str = "", agents: bool = True, timesfm: bool = True,
-               world: bool = True, news: bool = True):
+               world: bool = True, news: bool = True, ft: bool = True):
     if SC.state["status"] in ("loading", "downloading"):
         pr = SC.state.get("progress")
         raise HTTPException(503, f"Laya 模型{'下載中 ' + str(pr) + '%' if pr is not None else '載入中'}，請稍候")
@@ -452,13 +465,13 @@ def decide_api(symbol: str, horizon: int = 20, date: str = "", agents: bool = Tr
         except Exception as e:  # noqa: BLE001
             raise HTTPException(503, f"Laya 模型無法載入：{e}") from e
     h = horizon if horizon in THRESH else 20
-    key = (symbol, h, date, agents, timesfm, world, news)
+    key = (symbol, h, date, agents, timesfm, world, news, ft)
     with _clock:
         hit = _cache.get(key)
         if hit and time.time() - hit[0] < 600:
             return hit[1]
     try:
-        d = jsonable(decide(symbol, date or None, h, use_agents=agents, use_timesfm=timesfm, use_world=world, use_news=news))
+        d = jsonable(decide(symbol, date or None, h, use_agents=agents, use_timesfm=timesfm, use_world=world, use_news=news, use_ft=ft))
     except ValueError as e:
         raise HTTPException(404, str(e)) from e
     with _clock:

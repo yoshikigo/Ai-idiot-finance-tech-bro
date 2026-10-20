@@ -27,6 +27,7 @@ SCHEMA = [
     {"name": "text", "label": "自訂新聞（情緒模式，每行一則；留空則抓該股新聞）", "type": "textarea"},
     {"name": "language", "label": "輸出語言", "type": "select", "default": "Traditional Chinese",
      "options": [{"value": "Traditional Chinese", "label": "繁體中文"}, {"value": "English", "label": "English"}]},
+    {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
 # --- verbatim from FinGPT_Forecaster/app.py
@@ -92,6 +93,9 @@ def forecaster(ctx: Ctx, sym: str, end: dt.date, n_weeks: int, use_basics: bool,
     prompt = company_prompt(sym, info) + "\n\n" + "\n\n".join(blocks)
     if use_basics:
         prompt += "\n\n" + basics_prompt(sym)
+    if llm.get("context"):  # FT 市場背景 (Chinese news, flows, revenue, sector, macro, events up to the base date)
+        prompt += "\n\n[Market Context from FT terminal]:\n\n" + llm["context"]
+        ctx.log(f"帶入 FT 市場背景：{llm.get('context_parts') or ''}")
     prompt += (f"\n\nBased on all the information before {end}, let's first analyze the positive developments and "
                f"potential concerns for {sym}. Come up with 2-4 most important factors respectively and keep them "
                f"concise. Most factors should be inferred from company related news. Then make your prediction of "

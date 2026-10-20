@@ -19,8 +19,8 @@ router = APIRouter(prefix="/api/agent")
 _hooks: dict = {}  # set by app.py: settings loader, llm block, engines map
 
 
-def init(load_settings, llm_block, engines):
-    _hooks.update(load_settings=load_settings, llm_block=llm_block, engines=engines)
+def init(load_settings, llm_block, engines, enrich_job=None):
+    _hooks.update(load_settings=load_settings, llm_block=llm_block, engines=engines, enrich_job=enrich_job)
 
 
 def _out(text: str, plain: bool = False, data=None, fmt: str = "text"):
@@ -498,12 +498,14 @@ async def analyze(req: Request):
         else:
             params.setdefault("tickers", ", ".join(syms))
     params.setdefault("language", _hooks["load_settings"]().get("language", "Traditional Chinese"))
-    llm = _hooks["llm_block"](_hooks["load_settings"]())
     try:
         async with httpx.AsyncClient(timeout=30) as c:
             schema = (await c.get(f"{url}/meta")).json().get("schema", [])
             params = coerce(params, schema)
-            r = await c.post(f"{url}/jobs", json={"params": params, "llm": llm})
+            body = {"params": params, "llm": _hooks["llm_block"](_hooks["load_settings"]())}
+            if _hooks.get("enrich_job"):  # same lessons + FT 市場背景 as the web UI
+                body = await asyncio.to_thread(_hooks["enrich_job"], eng, body)
+            r = await c.post(f"{url}/jobs", json=body)
     except httpx.HTTPError as e:
         raise HTTPException(503, f"{eng} 引擎離線（systemctl --user status ft-{eng}）：{e}") from e
     if r.status_code >= 400:

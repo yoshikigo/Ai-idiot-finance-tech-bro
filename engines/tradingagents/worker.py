@@ -30,6 +30,7 @@ SCHEMA = [
      "default": limits.DEFAULT_CAPS["debate"], "min": 512, "max": 16384},
     {"name": "max_tokens_report", "label": "分析師報告每次輸出上限（tokens）", "type": "int",
      "default": limits.DEFAULT_CAPS["report"], "min": 1024, "max": 32768},
+    {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
 SECTIONS = [
@@ -111,6 +112,10 @@ def run(ctx: Ctx) -> dict:
         except Exception as e:  # noqa: BLE001
             ctx.log(f"世界訊號無法讀取，略過：{e}")
 
+    ft_ctx = (ctx.llm or {}).get("context") or ""
+    if ft_ctx:  # FT 市場背景: Chinese news, flows, revenue, sector, macro, events — every agent reads it
+        graph_cls = world_hook.graph_class(graph_cls, ft_ctx)
+        ctx.log(f"帶入 FT 市場背景：{(ctx.llm or {}).get('context_parts') or ''}（{len(ft_ctx)} 字）")
     lessons = (ctx.llm or {}).get("lessons") or ""
     if lessons:  # 檢討回饋：appended to the instrument context every agent reads
         graph_cls = world_hook.graph_class(graph_cls, "LESSONS FROM REVIEWING YOUR PAST CALLS AGAINST ACTUAL PRICES "
@@ -149,6 +154,8 @@ def run(ctx: Ctx) -> dict:
         if cut:
             md.insert(1, f"> ⚠️ {'、'.join(cut)} 的輸出達到上限被截斷（內容保留，流程照常完成）。若常發生，可在參數調高上限。\n")
         md.append("<details><summary>⏱ 各節點耗時與輸出量</summary>\n\n" + limits.summary(stats) + "\n</details>\n")
+    if ft_ctx:
+        md.append("\n<details><summary>分析時帶入的 FT 市場背景</summary>\n\n```\n" + ft_ctx + "\n```\n</details>\n")
     if world_info:
         md.append("<details><summary>🌐 分析時提供給代理人的現實世界訊號（God's Eye View）</summary>\n\n"
                   + world_info["digest"] + "\n</details>\n")

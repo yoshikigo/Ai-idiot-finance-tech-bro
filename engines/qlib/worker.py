@@ -50,6 +50,7 @@ SCHEMA = [
     {"name": "refresh", "label": "重新下載資料", "type": "bool", "default": False},
     {"name": "language", "label": "解讀語言", "type": "select", "default": "Traditional Chinese",
      "options": [{"value": "Traditional Chinese", "label": "繁體中文"}, {"value": "English", "label": "English"}]},
+    {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
 
@@ -233,7 +234,8 @@ def compute(ctx) -> dict:
              "one-year test window. Be concise and use markdown.",
         f"模型 {mname} / Alpha158 / 股票池 {uni} / 基準 {bench}\n指標：\n" +
         "\n".join(f"- {a}: {b}" for a, b in metrics) +
-        f"\n\n{latest_day:%Y-%m-%d} 預測分數前段：{', '.join(f'{r[1]} {r[2]}' for r in picks[:topk])}\n後段：{', '.join(f'{r[0]} {r[1]}' for r in bottom)}",
+        f"\n\n{latest_day:%Y-%m-%d} 預測分數前段：{', '.join(f'{r[1]} {r[2]}' for r in picks[:topk])}\n後段：{', '.join(f'{r[0]} {r[1]}' for r in bottom)}"
+        + (("\n\n" + llm["context"]) if llm.get("context") else ""),
         language=lang)
 
     md = (f"# Qlib · {mname} + Alpha158 · {uni.upper()}\n\n"

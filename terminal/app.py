@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 
-from ft_common import context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, sectors, supplychain, twmacro, twmarket, world
+from ft_common import brief, context, dca, edgar, toolkit, events, fomc, focus, fred, funds, fx, ledger, market, notes, ollama, sectors, supplychain, twmacro, twmarket, world
 
 DATA = Path(os.environ.get("FT_DATA", "/data"))
 DATA.mkdir(parents=True, exist_ok=True)
@@ -345,7 +345,7 @@ async def api_forecast(s: str, h: int = 30, model: str = "", context: int = 1024
 # ------------------------------------------------------------------ Laya decision (買進／賣出／放空… %)
 @app.get("/api/decide")
 async def api_decide(s: str, h: int = 20, date: str = "", agents: bool = True, timesfm: bool = True, world: bool = True,
-                     news: bool = True):
+                     news: bool = True, ft: bool = True):
     url = ENGINES.get("laya")
     if not url:
         raise HTTPException(404, "沒有設定 laya 引擎")
@@ -353,7 +353,8 @@ async def api_decide(s: str, h: int = 20, date: str = "", agents: bool = True, t
         async with httpx.AsyncClient(timeout=600) as c:
             r = await c.get(f"{url}/decide", params={"symbol": s, "horizon": h, "date": date, "agents": str(agents).lower(),
                                                      "timesfm": str(timesfm).lower(), "world": str(world).lower(),
-                                                     "news": str(news).lower()})
+                                                     "news": str(news).lower(),
+                                                     "ft": str(ft).lower()})
     except httpx.HTTPError as e:
         raise HTTPException(503, f"Laya 引擎離線（systemctl --user status ft-laya）：{e}") from e
     if r.status_code >= 400:
@@ -464,6 +465,16 @@ async def api_ask(req: Request):
                 parts.append(await run_in_threadpool(edgar.filings_text, t, 8))
             except Exception:  # noqa: BLE001
                 pass
+    for tt in targets[:2]:  # 台股：籌碼與月營收（終端機自己的資料庫），問個股時一律帶上
+        if tt and twmarket.is_tw(tt) and not tt.startswith("^"):
+            code = twmarket.code_of(tt)
+            for fn in (brief.flows_section, brief.revenue_section):
+                try:
+                    txt = await run_in_threadpool(fn, code, None)
+                    if txt:
+                        parts.append(f"{txt}（{tt}）")
+                except Exception:  # noqa: BLE001
+                    pass
     if any(k in last_q for k in ("技術", "均線", "KD", "RSI", "MACD", "布林", "支撐", "壓力", "型態", "一目")):
         for tt in targets[:2]:
             try:
@@ -555,6 +566,52 @@ def _eng(name: str) -> str:
     return ENGINES[name]
 
 
+CTX_ENGINES = ("tradingagents", "hedgefund", "fingpt", "qlib", "finrl", "timesfm")
+
+
+def _job_symbols(name: str, p: dict) -> list[str]:
+    raw = p.get("ticker") if name in ("tradingagents", "fingpt", "timesfm") else (
+        p.get("tickers") if name != "qlib" or p.get("universe") == "custom" else "")
+    out = []
+    for t in str(raw or "").replace("，", ",").replace(" ", ",").split(","):
+        t = t.strip()
+        if t:
+            out.append(context.resolve(t) or t)
+    return [s for s in out if not s.startswith(context.FUND_PREFIX)]
+
+
+def enrich_job(name: str, body: dict) -> dict:
+    """Everything an engine job gets besides its own params: Ollama settings, 檢討回饋 (lessons) and the
+    FT 市場背景 (brief.py) — same for the web UI, Hermes and Open WebUI."""
+    s = load_settings()
+    body["llm"] = llm_block(s)
+    if name in ledger.LLM_ENGINES and (s.get("ledger_feedback") or {}).get(name, True):
+        try:  # 檢討回饋：the agent's latest lessons ride along in the llm block
+            les = ledger.lessons_text(name)
+            if les:
+                body["llm"]["lessons"] = les
+        except Exception:  # noqa: BLE001
+            pass
+    p = body.get("params") or {}
+    if name in CTX_ENGINES and str(p.get("ft_context", True)).lower() not in ("false", "0", "no", "off"):
+        date = p.get("date") if p.get("date") not in (None, "", "today") else None
+        try:
+            syms = _job_symbols(name, p)
+            if name in ("tradingagents", "fingpt", "timesfm") and syms:
+                b = brief.build(syms[0], date)
+                body["llm"]["context"] = b["text"]
+            elif syms:
+                b = brief.build_many(syms, date)
+                body["llm"].update(context=b["text"], context_by=b["by_symbol"])
+            else:
+                b = brief.build_market(date, True)
+                body["llm"]["context"] = b["text"]
+            body["llm"]["context_parts"] = brief.describe(b["parts"])
+        except Exception as e:  # noqa: BLE001  never block an analysis on the extras
+            print("FT context failed:", name, e)
+    return body
+
+
 @app.api_route("/api/engines/{name}/jobs", methods=["GET", "POST"])
 async def eng_jobs(name: str, req: Request):
     url = _eng(name)
@@ -563,16 +620,7 @@ async def eng_jobs(name: str, req: Request):
             if req.method == "GET":
                 r = await c.get(f"{url}/jobs")
             else:
-                body = await req.json()
-                s = load_settings()
-                body["llm"] = llm_block(s)
-                if name in ledger.LLM_ENGINES and (s.get("ledger_feedback") or {}).get(name, True):
-                    try:  # 檢討回饋：the agent's latest lessons ride along in the llm block
-                        les = ledger.lessons_text(name)
-                        if les:
-                            body["llm"]["lessons"] = les
-                    except Exception:  # noqa: BLE001
-                        pass
+                body = await run_in_threadpool(enrich_job, name, await req.json())
                 r = await c.post(f"{url}/jobs", json=body)
     except httpx.HTTPError as e:
         raise HTTPException(503, f"引擎 {name} 離線（systemctl --user status ft-{name}）") from e
@@ -956,6 +1004,13 @@ def api_sectors(market: str = "us", top: int = 30):  # noqa: A002
         _err(e)
 
 
+@app.get("/api/brief")
+def api_brief(s: str, date: str = ""):
+    """FT 市場背景預覽：分析這檔時會送給 AI 引擎的內容（date＝回測基準日，空白＝今天）。"""
+    sym = context.resolve(s) or s
+    return brief.build(sym, date or None)
+
+
 @app.get("/api/twmacro")
 def api_twmacro():
     return {"rows": twmacro.snapshot(), "groups": twmacro.GROUPS, "lights": [
@@ -1056,7 +1111,7 @@ app.include_router(auth.router)
 # ------------------------------------------------------------------ agent API + warm-up
 import agent_api  # noqa: E402
 
-agent_api.init(load_settings, llm_block, ENGINES)
+agent_api.init(load_settings, llm_block, ENGINES, enrich_job)
 app.include_router(agent_api.router)
 
 
