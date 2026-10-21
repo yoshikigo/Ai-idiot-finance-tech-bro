@@ -1,4 +1,4 @@
-# Si-idiot-finance-tech-bro 久留美的AI煉股金融終端
+# Ai-idiot-finance-tech-bro 久留美的AI煉股金融終端
 
 繁體中文的個人金融終端機：台股、ETF、基金、美股、總經、匯率、重大事件一個畫面看完，右側 AI 側欄整合 TradingAgents、ai-hedge-fund、Qlib、FinRL、FinGPT、TimesFM、Laya 等開源專案，**所有 LLM 都跑在你自己的 Ollama**。同一套資料也能從 LINE／Signal（Hermes）和 Open WebUI 查詢。整套用 rootless Podman＋Quadlet 部署在一台 Linux 主機上。
 
