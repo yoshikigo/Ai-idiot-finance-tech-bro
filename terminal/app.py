@@ -27,17 +27,19 @@ ENGINES = {}
 for item in os.environ.get("FT_ENGINES", "tradingagents=http://127.0.0.1:8131,hedgefund=http://127.0.0.1:8132,"
                                           "qlib=http://127.0.0.1:8133,finrl=http://127.0.0.1:8134,"
                                           "fingpt=http://127.0.0.1:8135,timesfm=http://127.0.0.1:8136,"
+                                          "kronos=http://127.0.0.1:8139,"
                                           "laya=http://127.0.0.1:8137,research=http://127.0.0.1:8138").split(","):
     if "=" in item:
         k, v = item.split("=", 1)
         ENGINES[k.strip()] = v.strip().rstrip("/")
+ENGINES.setdefault("kronos", "http://127.0.0.1:8139")  # an older FT_ENGINES in the env file would not list it
 
 DEFAULT_SETTINGS = {
     "ollama_url": ollama.DEFAULT_URL,
     "model": ollama.DEFAULT_MODEL,
     "models": {  # per-engine overrides; empty = use "model"
         "tradingagents_deep": "", "tradingagents_quick": "", "hedgefund": "", "qlib": "", "finrl": "",
-        "fingpt": "", "timesfm": "", "research": "", "ask": "",
+        "fingpt": "", "timesfm": "", "kronos": "", "research": "", "ask": "",
     },
     "num_ctx": int(os.environ.get("FT_NUM_CTX", "0")) or None,
     "temperature": 0.2,
@@ -45,6 +47,7 @@ DEFAULT_SETTINGS = {
     "language": "Traditional Chinese",
     "color_mode": "tw",
     "timesfm_model": "2.5",
+    "kronos_model": "small",
     "obsidian_auto": True,
     "watchlist": ["^TWII", "2330.TW", "2317.TW", "2454.TW", "0050.TW", "0056.TW", "00878.TW", "00679B.TWO", "NVDA",
                   "AAPL", "TSM", "^GSPC", "^SOX", "TWD=X", "BTC-USD"],
@@ -122,7 +125,7 @@ def get_settings():
 async def put_settings(req: Request):
     body = await req.json()
     s = load_settings()
-    for k in ("ollama_url", "model", "num_ctx", "temperature", "think", "language", "color_mode", "timesfm_model", "obsidian_auto", "obsidian_engines", "watchlist", "launchpad"):
+    for k in ("ollama_url", "model", "num_ctx", "temperature", "think", "language", "color_mode", "timesfm_model", "kronos_model", "obsidian_auto", "obsidian_engines", "watchlist", "launchpad"):
         if k in body:
             s[k] = body[k]
     if isinstance(body.get("models"), dict):
@@ -337,6 +340,24 @@ async def api_forecast(s: str, h: int = 30, model: str = "", context: int = 1024
                                                        "backtest": str(backtest).lower()})
     except httpx.HTTPError as e:
         raise HTTPException(503, f"TimesFM 引擎離線（systemctl --user status ft-timesfm）：{e}") from e
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.json().get("detail", r.text) if "json" in r.headers.get("content-type", "") else r.text)
+    return r.json()
+
+
+# ------------------------------------------------------------------ Kronos K-line forecast overlay
+@app.get("/api/kronos")
+async def api_kronos(s: str, h: int = 20, model: str = "", samples: int = 16, backtest: bool = False):
+    url = ENGINES.get("kronos")
+    if not url:
+        raise HTTPException(404, "沒有設定 kronos 引擎")
+    model = model or load_settings().get("kronos_model", "small")
+    try:
+        async with httpx.AsyncClient(timeout=600) as c:
+            r = await c.get(f"{url}/forecast", params={"symbol": s, "horizon": h, "model": model, "samples": samples,
+                                                       "backtest": str(backtest).lower()})
+    except httpx.HTTPError as e:
+        raise HTTPException(503, f"Kronos 引擎離線（systemctl --user status ft-kronos）：{e}") from e
     if r.status_code >= 400:
         raise HTTPException(r.status_code, r.json().get("detail", r.text) if "json" in r.headers.get("content-type", "") else r.text)
     return r.json()
@@ -579,7 +600,7 @@ def _eng(name: str) -> str:
     return ENGINES[name]
 
 
-CTX_ENGINES = ("tradingagents", "hedgefund", "fingpt", "qlib", "finrl", "timesfm")
+CTX_ENGINES = ("tradingagents", "hedgefund", "fingpt", "qlib", "finrl", "timesfm", "kronos")
 # what each engine already reads by itself → not repeated in its FT 市場背景
 CTX_EXCLUDE = {"tradingagents": frozenset({"world", "news_us"}), "fingpt": frozenset({"news", "news_us"}),
                "timesfm": frozenset({"world"}), "qlib": frozenset({"news", "news_us", "world"}),
@@ -587,7 +608,7 @@ CTX_EXCLUDE = {"tradingagents": frozenset({"world", "news_us"}), "fingpt": froze
 
 
 def _job_symbols(name: str, p: dict) -> list[str]:
-    raw = p.get("ticker") if name in ("tradingagents", "fingpt", "timesfm") else (
+    raw = p.get("ticker") if name in ("tradingagents", "fingpt", "timesfm", "kronos") else (
         p.get("tickers") if name != "qlib" or p.get("universe") == "custom" else "")
     out = []
     for t in str(raw or "").replace("，", ",").replace(" ", ",").split(","):
@@ -615,7 +636,7 @@ def enrich_job(name: str, body: dict) -> dict:
         ex = CTX_EXCLUDE.get(name, frozenset())
         try:
             syms = _job_symbols(name, p)
-            if name in ("tradingagents", "fingpt", "timesfm") and syms:
+            if name in ("tradingagents", "fingpt", "timesfm", "kronos") and syms:
                 b = brief.build(syms[0], date, exclude=ex, engine=name)
                 body["llm"]["context"] = b["text"]
             elif syms:

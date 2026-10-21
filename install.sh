@@ -12,7 +12,7 @@
 #                                    an existing install keeps its location)
 #   FT_VAULT=/path/to/vault ./install.sh   Obsidian vault (default ~/Obsidian/vault)
 #   TA_REF=main ./install.sh tradingagents     build an engine from another upstream ref
-#                                              (TA_REF / HF_REF / FINRL_REF / FINGPT_REF / GEV_REF)
+#                                              (TA_REF / HF_REF / FINRL_REF / FINGPT_REF / GEV_REF / KRONOS_REF)
 set -euo pipefail
 cd "$(dirname "$(readlink -f "$0")")"
 
@@ -24,18 +24,19 @@ LIBDIR="$HOME/.local/share/fin-terminal"
 PREV_ROOT=$(sed -n 's|^Volume=\(.*\)/data:/data$|\1|p' "$QDIR/fin-terminal.container" 2>/dev/null | head -1)
 DATA_ROOT="${FT_DATA_ROOT:-${PREV_ROOT:-$HOME/fin-terminal-data}}"
 DATA_ROOT="${DATA_ROOT%/}"
-ALL=(gev terminal tradingagents hedgefund qlib finrl timesfm laya)
+ALL=(gev terminal tradingagents hedgefund qlib finrl timesfm laya kronos)
 declare -A IMG=([gev]=gods-eye-view [terminal]=fin-terminal [tradingagents]=ft-tradingagents [hedgefund]=ft-hedgefund
-                [qlib]=ft-qlib [finrl]=ft-finrl [timesfm]=ft-timesfm [laya]=ft-laya)
+                [qlib]=ft-qlib [finrl]=ft-finrl [timesfm]=ft-timesfm [laya]=ft-laya [kronos]=ft-kronos)
 declare -A FILE=([gev]=gods-eye-view/Containerfile [terminal]=terminal/Containerfile
                  [tradingagents]=engines/tradingagents/Containerfile
                  [hedgefund]=engines/hedgefund/Containerfile [qlib]=engines/qlib/Containerfile [finrl]=engines/finrl/Containerfile
-                 [timesfm]=engines/timesfm/Containerfile [laya]=engines/laya/Containerfile)
+                 [timesfm]=engines/timesfm/Containerfile [laya]=engines/laya/Containerfile
+                 [kronos]=engines/kronos/Containerfile)
 declare -A UNITS=([gev]=gods-eye-view [terminal]="fin-terminal ft-fingpt ft-research" [tradingagents]=ft-tradingagents [hedgefund]=ft-hedgefund
-                  [qlib]=ft-qlib [finrl]=ft-finrl [timesfm]=ft-timesfm [laya]=ft-laya)
+                  [qlib]=ft-qlib [finrl]=ft-finrl [timesfm]=ft-timesfm [laya]=ft-laya [kronos]=ft-kronos)
 declare -A PORT=([gods-eye-view]=4173 [fin-terminal]=8130 [ft-tradingagents]=8131 [ft-hedgefund]=8132 [ft-qlib]=8133
-                 [ft-finrl]=8134 [ft-fingpt]=8135 [ft-timesfm]=8136 [ft-laya]=8137 [ft-research]=8138)
-declare -A REFVAR=([gev]=GEV_REF [terminal]=FINGPT_REF [tradingagents]=TA_REF [hedgefund]=HF_REF [finrl]=FINRL_REF)
+                 [ft-finrl]=8134 [ft-fingpt]=8135 [ft-timesfm]=8136 [ft-laya]=8137 [ft-research]=8138 [ft-kronos]=8139)
+declare -A REFVAR=([gev]=GEV_REF [terminal]=FINGPT_REF [tradingagents]=TA_REF [hedgefund]=HF_REF [finrl]=FINRL_REF [kronos]=KRONOS_REF)
 
 c_ok()   { printf '\e[32m✓\e[0m %s\n' "$*"; }
 c_warn() { printf '\e[33m!\e[0m %s\n' "$*"; }
@@ -58,7 +59,7 @@ for a in "$@"; do
     --tailscale) TS=1 ;;
     --cloudflare) CF=1 ;;
     -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
-    gev|terminal|tradingagents|hedgefund|qlib|finrl|timesfm|laya) SEL+=("$a") ;;
+    gev|terminal|tradingagents|hedgefund|qlib|finrl|timesfm|laya|kronos) SEL+=("$a") ;;
     gods-eye-view|world) SEL+=(gev) ;;
     fingpt) SEL+=(terminal) ;;
     *) c_err "unknown argument: $a"; exit 1 ;;
@@ -176,7 +177,7 @@ for comp in "${SEL[@]}"; do
   done
 done
 # terminal units installed earlier with the old named volume must move too
-for u in fin-terminal ft-fingpt ft-research ft-tradingagents ft-hedgefund ft-qlib ft-finrl ft-timesfm ft-laya; do
+for u in fin-terminal ft-fingpt ft-research ft-tradingagents ft-hedgefund ft-qlib ft-finrl ft-timesfm ft-laya ft-kronos; do
   f="$QDIR/$u.container"
   if [[ -f "$f" ]] && grep -q 'fin-terminal-data:/data' "$f"; then
     put_unit "quadlet/$u.container" "$f"; units+=("$u"); c_ok "$u.container（改用 $DATA_ROOT/data）"
@@ -280,6 +281,6 @@ echo "金鑰：   $CFG/gods-eye-view.env（AISSTREAM_API_KEY 才有船舶資料�
 echo "Obsidian：$CFG/obsidian.env → 筆記在 vault 的 ${FT_OBSIDIAN_FOLDER:-finance}/AI 預測/"
 echo "研究：   策略研究的資料庫在背景從官方來源回補（月營收／財報約 1 小時、日資料 5 年約 6–8 小時），進度看「資料庫」功能鍵"
 echo "Laya：   第一次啟動會下載約 1.7 GB 模型到 $DATA_ROOT/data/laya（journalctl --user -u ft-laya -f 看進度）"
-echo "日誌：   journalctl --user -u fin-terminal -u gods-eye-view -u ft-tradingagents -u ft-timesfm -u ft-laya -u ft-obsidian-apply -f"
+echo "日誌：   journalctl --user -u fin-terminal -u gods-eye-view -u ft-tradingagents -u ft-timesfm -u ft-kronos -u ft-laya -u ft-obsidian-apply -f"
 echo "Hermes： ./scripts/install-hermes-skill.sh        （LINE / Signal 查股價、世界事件、跑 AI 分析）"
 echo "Open WebUI：Workspace → Tools → ＋，貼上 openwebui/ft_terminal_tool.py"

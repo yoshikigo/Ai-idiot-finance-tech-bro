@@ -29,8 +29,9 @@ SETTINGS = DATA / "settings.json"
 STATE = DATA / "obsidian-state.json"
 
 ENGINE_LABEL = {"tradingagents": "TradingAgents", "hedgefund": "投資大師", "qlib": "Qlib", "finrl": "FinRL",
-                "fingpt": "FinGPT", "timesfm": "TimesFM", "laya": "Laya", "research": "策略回測"}
-FORECAST_ENGINES = ("tradingagents", "fingpt", "timesfm", "hedgefund", "laya")
+                "fingpt": "FinGPT", "timesfm": "TimesFM", "kronos": "Kronos", "laya": "Laya", "research": "策略回測"}
+FORECAST_ENGINES = ("tradingagents", "fingpt", "timesfm", "kronos", "hedgefund", "laya")
+BAND_ENGINES = ("timesfm", "kronos")  # price forecasts with a P10–P90 band, scored at horizon_end
 _BAD = re.compile(r'[\\/:*?"<>|#^\[\]\x00-\x1f]')
 
 
@@ -130,7 +131,7 @@ def job_meta(job: dict) -> dict:
     if ticker:
         meta["price_at"] = r.get("last") or price_on(ticker, day)
     fc = r.get("forecast_summary")
-    if eng == "timesfm" and fc:
+    if eng in BAND_ENGINES and fc:
         meta.update({"horizon_end": fc.get("horizon_end"), "forecast_median": fc.get("median_end"),
                      "forecast_p10": fc.get("p10_end"), "forecast_p90": fc.get("p90_end"),
                      "forecast_change_pct": fc.get("change_pct"), "p_up": fc.get("p_up"), "price_at": fc.get("last")})
@@ -256,11 +257,11 @@ WHERE ticker
 GROUP BY ticker
 ```
 
-## TimesFM 預測到期
+## TimesFM／Kronos 預測到期
 ```dataview
 TABLE ticker AS 標的, price_at AS 起點, forecast_median AS 中位數, forecast_p10 AS P10, forecast_p90 AS P90, horizon_end AS 到期
 FROM "{FOLDER}/AI 預測"
-WHERE engine = "timesfm" AND horizon_end
+WHERE (engine = "timesfm" OR engine = "kronos") AND horizon_end
 SORT horizon_end ASC
 ```
 """
@@ -333,7 +334,7 @@ def review(now_prices: dict | None = None, today: dt.date | None = None) -> dict
                 continue
             row = {"engine": eng, "date": meta.get("date"), "ticker": t, "name": _name(t), "signal": sig, "price_at": p0,
                    "job_id": j["id"]}
-            if eng == "timesfm" and meta.get("horizon_end"):
+            if eng in BAND_ENGINES and meta.get("horizon_end"):
                 he = meta["horizon_end"]
                 row["horizon_end"] = he
                 if he > today.isoformat():
@@ -353,13 +354,13 @@ def review(now_prices: dict | None = None, today: dt.date | None = None) -> dict
                 continue
             ret = (p1 / p0 - 1) * 100
             row["price_now"], row["ret_pct"] = p1, ret
-            d = direction(sig) if eng != "timesfm" else (1 if (meta.get("forecast_change_pct") or 0) > 1 else -1 if (meta.get("forecast_change_pct") or 0) < -1 else 0)
+            d = direction(sig) if eng not in BAND_ENGINES else (1 if (meta.get("forecast_change_pct") or 0) > 1 else -1 if (meta.get("forecast_change_pct") or 0) < -1 else 0)
             if d is not None:
                 row["hit"] = (ret > 0) if d == 1 else (ret < 0) if d == -1 else (abs(ret) < 3)
             rows.append(row)
             s = stats.setdefault(eng, {"n": 0, "hits": 0, "scored": 0, "band_n": 0, "band_in": 0})
             s["n"] += 1
-            if "hit" in row and (eng != "timesfm" or row.get("status") == "已到期") and (eng == "timesfm" or (today - dt.date.fromisoformat(row["date"])).days >= 5):
+            if "hit" in row and (eng not in BAND_ENGINES or row.get("status") == "已到期") and (eng in BAND_ENGINES or (today - dt.date.fromisoformat(row["date"])).days >= 5):
                 s["scored"] += 1
                 s["hits"] += int(row["hit"])
             if "in_band" in row:

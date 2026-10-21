@@ -1,0 +1,24 @@
+# podman build -t localhost/ft-kronos:latest -f engines/kronos/Containerfile .
+# Kronos (shiyu-coder/Kronos, MIT): candlestick foundation model. CPU torch — Kronos-small (24.7M) samples
+# 16–24 paths of 20 daily bars in seconds on a desktop CPU, leaving the GPU to Ollama.
+# Weights (NeoQuasar/Kronos-*, ~10–400 MB) download from Hugging Face on first use into /data/hf.
+FROM docker.io/library/python:3.12-slim
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
+RUN pip install --index-url https://download.pytorch.org/whl/cpu "torch==2.14.*"
+COPY terminal/requirements.lock /tmp/req.lock
+RUN pip install -r /tmp/req.lock
+COPY engines/kronos/requirements.extra /tmp/extra.txt
+RUN pip install -r /tmp/extra.txt
+# Kronos is not a pip package: keep only its `model` package (imported as `from model import Kronos…`).
+ARG UPSTREAM_REF=67b630e67f6a18c9e9be918d9b4337c960db1e9a
+RUN git init -q /opt/Kronos && cd /opt/Kronos \
+ && git remote add origin https://github.com/shiyu-coder/Kronos.git \
+ && git fetch -q --depth 1 origin ${UPSTREAM_REF} && git checkout -q FETCH_HEAD \
+ && rm -rf .git examples figures finetune finetune_csv webui tests
+COPY common /app/common
+COPY engines/kronos /app/engine
+ENV PYTHONPATH=/app/common:/app/engine:/opt/Kronos FT_DATA=/data UPSTREAM_REF=${UPSTREAM_REF} HF_HOME=/data/hf \
+    KRONOS_DEVICE=cpu KRONOS_PRELOAD=1
+WORKDIR /app/engine
+CMD ["python", "worker.py"]

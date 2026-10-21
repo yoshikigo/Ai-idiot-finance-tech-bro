@@ -1,6 +1,6 @@
 # Ai-idiot-finance-tech-bro 久留美的AI煉股金融終端
 
-繁體中文的個人金融終端機：台股、ETF、基金、美股、總經、匯率、重大事件一個畫面看完，右側 AI 側欄整合 TradingAgents、ai-hedge-fund、Qlib、FinRL、FinGPT、TimesFM、Laya 等開源專案，**所有 LLM 都跑在你自己的 Ollama**。同一套資料也能從 LINE／Signal（Hermes）和 Open WebUI 查詢。整套用 rootless Podman＋Quadlet 部署在一台 Linux 主機上。
+繁體中文的個人金融終端機：台股、ETF、基金、美股、總經、匯率、重大事件一個畫面看完，右側 AI 側欄整合 TradingAgents、ai-hedge-fund、Qlib、FinRL、FinGPT、TimesFM、Kronos、Laya 等開源專案，**所有 LLM 都跑在你自己的 Ollama**。同一套資料也能從 LINE／Signal（Hermes）和 Open WebUI 查詢。整套用 rootless Podman＋Quadlet 部署在一台 Linux 主機上。
 
 ![總覽](docs/screenshots/01-overview.png)
 
@@ -38,7 +38,7 @@
 
 - 指令：`台積電`、`2330 走勢`、`^TWII`、`NVDA`；`2330 盤中` 看分時。
 - 月線、季線、1 月～10 年區間；**📌 大事**：指數大波動、Fed 決策、台灣央行、美國 CPI／非農／PCE、中美談判、軍演、歷史大事（滑過看說明，點一下跳到「大事」頁）；**🌐 事件**：God's Eye View 偵測到的地震、軍機、航運異常。
-- **🔮 預測**：TimesFM 畫出未來 10–120 個交易日的中位數與 80% 區間。
+- **🔮 預測**：TimesFM 畫出未來 10–120 個交易日的中位數與 80% 區間；**🕯 Kronos**：K 線基礎模型抽樣多條未來路徑，畫出半透明的中位 K 棒與收盤 P10／P90。
 - 每格的功能列：概況、新聞、財報（台股＋美股 SEC 原始申報）、⚖ 判斷（Laya）、🧰 工具箱、⛓ 供應鏈、AI▸。
 
 ### 台股 ETF 與基金
@@ -147,6 +147,7 @@
 | FinRL | [AI4Finance-Foundation/FinRL](https://github.com/AI4Finance-Foundation/FinRL) | 強化學習（PPO／A2C／SAC…）資產配置 vs 等權買進持有 |
 | FinGPT | [AI4Finance-Foundation/FinGPT](https://github.com/AI4Finance-Foundation/FinGPT) | 下週走勢預測、新聞情緒（台股用中文新聞） |
 | TimesFM | [google-research/timesfm](https://github.com/google-research/timesfm) | 時間序列基礎模型，零樣本預測價格、匯率、基金淨值＋回測（CPU） |
+| Kronos | [shiyu-coder/Kronos](https://github.com/shiyu-coder/Kronos) | 金融 K 線基礎模型（45+ 交易所預訓練），抽樣產生未來的開高低收量路徑：中位 K 棒、80% 區間、收高比例＋回測（CPU） |
 | Laya 判斷 | [receptron/laya](https://github.com/receptron/laya) | 一次推論給出買進／持有／觀望／賣出／放空的機率（CPU，非金融專用模型，請看命中率再參考） |
 | ASK | 本機 Ollama | 問任何問題；自動帶入問題提到的標的、總經、匯率、事件、世界訊號等相關資料 |
 
@@ -161,7 +162,7 @@
 | 市場 | 台灣總經、台幣匯率（美元、日圓、人民幣、歐元、韓元）、美國總經與 Fed 淨流動性、最近一次 FOMC 聲明措辭變化與 SEP、近 30 天大事（含中美、軍演）與接下來的日程 |
 | 交叉參考 | 其他 AI 引擎近 30 天對同一檔的結論、世界訊號 |
 
-TradingAgents 每個代理人都看得到；投資大師每位大師；FinGPT 的提示詞；Qlib／FinRL／TimesFM 的 Ollama 解讀；Laya 轉成英文狀態（台股中文新聞先由本機 Ollama 翻成英文）。引擎自己已經有的不重複送（例如 TradingAgents 的世界訊號與英文新聞、FinGPT 的新聞）。ASK 問到個股時也一律帶入這份背景（之前要出現「總經」「匯率」等字眼才會帶）。每個引擎的表單有「加入 FT 市場背景」可關閉；`/api/brief?s=2330` 預覽內容，執行紀錄與報告最後列出帶入了哪些段落。
+TradingAgents 每個代理人都看得到；投資大師每位大師；FinGPT 的提示詞；Qlib／FinRL／TimesFM／Kronos 的 Ollama 解讀；Laya 轉成英文狀態（台股中文新聞先由本機 Ollama 翻成英文）。引擎自己已經有的不重複送（例如 TradingAgents 的世界訊號與英文新聞、FinGPT 的新聞）。ASK 問到個股時也一律帶入這份背景（之前要出現「總經」「匯率」等字眼才會帶）。每個引擎的表單有「加入 FT 市場背景」可關閉；`/api/brief?s=2330` 預覽內容，執行紀錄與報告最後列出帶入了哪些段落。
 
 完成的分析可自動寫成 Obsidian 筆記（`finance/AI 預測/`），並每天產生「AI 預測回顧」對答案。
 
@@ -185,6 +186,7 @@ TradingAgents 每個代理人都看得到；投資大師每位大師；FinGPT �
 | `技術 2330`、`NVDA 選擇權`、`價值 KO`、`情報` | 分析工具箱 |
 | `分析 2330`、`大師 AAPL`、`量化`、`強化學習 2330 2317`、`預測 NVDA` | 開啟 AI 分頁並帶入標的 |
 | `判斷 台積電` | Laya 交易判斷 |
+| `K線預測 2330`、`KR 0050` | Kronos K 線預測（側欄分頁，含回測與解讀） |
 | `定期定額 0050, VOO` | 定期定額回測 |
 | `研究`、`選股 營收連續成長、投信在買`、`資料庫` | 策略研究 |
 | `世界` | 世界事件 |
@@ -213,6 +215,7 @@ TradingAgents 每個代理人都看得到；投資大師每位大師；FinGPT �
 | 「日圓匯率」「0050 定期定額 5 年績效」 | `ft.py twfx JPY`／`ft.py dca 0050 --years 5` |
 | 「台積電技術面」「NVDA 選擇權」 | `ft.py tech 2330`／`ft.py options NVDA` |
 | 「台積電該買還是賣」「0050 未來一個月預測」 | `ft.py decide 台積電`／`ft.py forecast 0050 --days 20` |
+| 「用 Kronos 看 0050 K 線預測」 | `ft.py kronos 0050 --days 20` |
 | 「找營收連續成長、投信在買的股票」 | `ft.py strategy "營收連續成長、投信在買"` |
 | 「台海最近有什麼動靜」 | `ft.py world 台灣` |
 | 「用 TradingAgents 分析 2330」 | `ft.py analyze tradingagents 2330`（沒跑完回 PENDING，再用 `ft.py job` 接著等） |
@@ -272,7 +275,7 @@ curl -XPOST localhost:8130/api/agent/analyze -H 'content-type: application/json'
 | 作業系統 | Linux（開發與使用於 Arch Linux），systemd 使用者服務 |
 | Podman | **rootless**，≥ 4.4（使用 Quadlet）；以一般使用者執行，不要用 root |
 | Ollama | 預設 `http://127.0.0.1:11434`，需要一個支援 tool calling 的模型（預設 `qwen3:32b`，可在 ⚙ 設定或 env 改） |
-| 硬體 | 建置約 15–25 分鐘；TimesFM、Laya、FinRL 跑在 CPU；記憶體建議 16 GB 以上；磁碟數十 GB（映像、模型權重、策略研究資料） |
+| 硬體 | 建置約 15–25 分鐘；TimesFM、Kronos、Laya、FinRL 跑在 CPU；記憶體建議 16 GB 以上；磁碟數十 GB（映像、模型權重、策略研究資料） |
 | 選用 | Tailscale（tailnet HTTPS）、Cloudflare Tunnel（公開網址）、Obsidian vault、Hermes、Open WebUI |
 
 讓服務開機自動啟動（不用登入）：
@@ -286,24 +289,24 @@ sudo loginctl enable-linger $USER
 ```bash
 git clone https://github.com/yoshikigo/fin_terminal.git fin-terminal
 cd fin-terminal
-./install.sh                 # 建 8 個映像、安裝 Quadlet 單元與 Obsidian 搬運器、啟動
+./install.sh                 # 建 9 個映像、安裝 Quadlet 單元與 Obsidian 搬運器、啟動
 ./tests/smoke.sh             # 用真實資料逐項檢查（報價、ETF、基金、總經、匯率、AI 引擎…）
 ```
 
-裝好後打開 `http://127.0.0.1:8130`。第一次啟動會下載證券清單與基金淨值（約 1–2 分鐘）；TimesFM（約 0.8 GB）與 Laya（約 1.7 GB）的權重會在第一次使用時從 Hugging Face 下載；策略研究的歷史資料在背景回補（月營收、財報約 1 小時，日資料數小時）。
+裝好後打開 `http://127.0.0.1:8130`。第一次啟動會下載證券清單與基金淨值（約 1–2 分鐘）；TimesFM（約 0.8 GB）、Kronos（small 約 100 MB）與 Laya（約 1.7 GB）的權重會在第一次使用時從 Hugging Face 下載；策略研究的歷史資料在背景回補（月營收、財報約 1 小時，日資料數小時）。
 
 `install.sh` 選項：
 
 | 指令 | 用途 |
 |---|---|
 | `./install.sh terminal` | 只重建終端機（UI、資料層、FinGPT、策略研究）；多數升級只需要這個 |
-| `./install.sh tradingagents hedgefund` | 只重建指定引擎（`gev terminal tradingagents hedgefund qlib finrl timesfm laya`） |
+| `./install.sh tradingagents hedgefund` | 只重建指定引擎（`gev terminal tradingagents hedgefund qlib finrl timesfm laya kronos`） |
 | `./install.sh --no-build` | 只重新安裝 Quadlet 單元並重啟 |
 | `./install.sh --no-build --tailscale` | 用 `tailscale serve` 開 tailnet HTTPS：`:8130`（終端）與 `:4173`（God's Eye View） |
 | `FT_PUBLIC_HOST=fin.example.com ./install.sh --no-build --cloudflare` | 透過 Cloudflare Tunnel 公開（見下方） |
 | `FT_DATA_ROOT=/mnt/disk ./install.sh` | 資料放到別處（預設 `~/fin-terminal-data`；已安裝的會沿用原位置） |
 | `FT_VAULT=~/Obsidian/vault ./install.sh` | Obsidian vault 位置 |
-| `TA_REF=main ./install.sh tradingagents` | 用上游其他版本建置（`TA_REF`／`HF_REF`／`FINRL_REF`／`FINGPT_REF`／`GEV_REF`） |
+| `TA_REF=main ./install.sh tradingagents` | 用上游其他版本建置（`TA_REF`／`HF_REF`／`FINRL_REF`／`FINGPT_REF`／`GEV_REF`／`KRONOS_REF`） |
 
 ### 設定檔
 
@@ -334,7 +337,7 @@ cd fin-terminal
 | 服務 | 埠 |
 |---|---|
 | fin-terminal（UI＋agent API） | 8130 |
-| ft-tradingagents／ft-hedgefund／ft-qlib／ft-finrl／ft-fingpt／ft-timesfm／ft-laya／ft-research | 8131–8138 |
+| ft-tradingagents／ft-hedgefund／ft-qlib／ft-finrl／ft-fingpt／ft-timesfm／ft-laya／ft-research／ft-kronos | 8131–8139 |
 | gods-eye-view（3D 地球＋MCP） | 4173 |
 
 ```bash
@@ -414,4 +417,4 @@ README 的截圖由 `scripts/screenshots.py`（Playwright）在示範資料模�
 
 ## 致謝
 
-TradingAgents、ai-hedge-fund、Qlib、FinRL、FinGPT、TimesFM、Laya、God's Eye View、TWSEMCPServer、TradingView Lightweight Charts 等開源專案；各專案依其原授權使用，模型權重授權請見各上游（例如 TimesFM 3.0 權重限非商業用途）。
+TradingAgents、ai-hedge-fund、Qlib、FinRL、FinGPT、TimesFM、Kronos、Laya、God's Eye View、TWSEMCPServer、TradingView Lightweight Charts 等開源專案；各專案依其原授權使用，模型權重授權請見各上游（例如 TimesFM 3.0 權重限非商業用途）。

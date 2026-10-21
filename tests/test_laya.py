@@ -37,6 +37,7 @@ def W(tmp_path, monkeypatch):
     import worker
     w = importlib.reload(worker)
     monkeypatch.setattr(w, "timesfm_line", lambda sym, h: None)  # no TimesFM engine in tests
+    monkeypatch.setattr(w, "kronos_line", lambda sym, h: None)
     yield w
     if w.SC.proc and w.SC.proc.poll() is None:
         w.SC.proc.kill()

@@ -52,6 +52,7 @@ python3 /opt/data/skills/fin-terminal/scripts/ft.py <指令> [參數]
 | 「幫我找營收連續成長、投信在買的股票」「今天有哪些高殖利率低本益比的股票」「這個選股方法回測績效如何」 | `ft.py strategy "營收連續成長、投信在買"`（本機 AI 轉成條件＋回測，1–3 分鐘）；內建策略直接打名稱：`ft.py strategy 高殖利率低本益比`；`ft.py strategy` 列出全部 |
 | 「之前的 AI 預測準不準」「TradingAgents 命中率多少」「AI 檢討了什麼」 | `ft.py ledger`（5／20／60 個交易日後用實際股價核對、各 agent 命中率、最近檢討與提醒）；`ft.py review` 是舊版簡易回顧 |
 | 「0050 未來一個月走勢預測」「台積電接下來 60 天會怎麼走」「這檔基金預測」 | `ft.py forecast 0050 --days 20`（TimesFM 統計預測，幾秒～1 分鐘；基金用 `FUND:<id>`，先 `fund` 查 id） |
+| 「0050 K 線預測」「用 Kronos 看台積電接下來走勢」 | `ft.py kronos 0050 --days 20` |
 
 ## AI 分析（比較久）
 

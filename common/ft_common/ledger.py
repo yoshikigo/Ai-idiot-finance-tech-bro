@@ -24,7 +24,7 @@ from . import market, notes
 
 log = logging.getLogger("ft.ledger")
 _lock = threading.Lock()
-ENGINES = ("tradingagents", "hedgefund", "fingpt", "timesfm", "laya", "qlib", "finrl", "research")
+ENGINES = ("tradingagents", "hedgefund", "fingpt", "timesfm", "kronos", "laya", "qlib", "finrl", "research")
 LLM_ENGINES = ("tradingagents", "hedgefund", "fingpt")      # these can take lessons back into their prompts
 HORIZONS = (5, 20, 60)
 NEUTRAL_BAND = {5: 2.0, 20: 4.0, 60: 7.0}
@@ -58,7 +58,7 @@ def _now() -> str:
 
 # ------------------------------------------------------------------ collect
 def _direction(engine: str, signal, fc: dict | None) -> int | None:
-    if engine == "timesfm":
+    if engine in notes.BAND_ENGINES:
         ch = (fc or {}).get("change_pct")
         return None if ch is None else (1 if ch > 1 else -1 if ch < -1 else 0)
     return notes.direction(signal)
@@ -68,7 +68,7 @@ def _model(job: dict) -> str:
     llm = job.get("llm") or {}
     models = llm.get("models") or {}
     key = {"tradingagents": "tradingagents_deep"}.get(job.get("engine"), job.get("engine"))
-    return models.get(key) or llm.get("model") or ("TimesFM" if job.get("engine") == "timesfm" else "")
+    return models.get(key) or llm.get("model") or ({"timesfm": "TimesFM", "kronos": "Kronos"}.get(job.get("engine"), ""))
 
 
 def _rows_from_job(job: dict) -> list[dict]:
@@ -93,7 +93,7 @@ def _rows_from_job(job: dict) -> list[dict]:
     t = meta.get("ticker")
     fc = None
     horizon = None
-    if eng == "timesfm" and meta.get("horizon_end"):
+    if eng in notes.BAND_ENGINES and meta.get("horizon_end"):
         fc = {k: meta.get(k) for k in ("horizon_end", "forecast_median", "forecast_p10", "forecast_p90", "forecast_change_pct", "p_up")}
         fc["change_pct"] = meta.get("forecast_change_pct")
     if eng == "fingpt" and (p.get("mode") or "forecast") == "forecast":

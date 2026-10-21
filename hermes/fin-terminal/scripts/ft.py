@@ -29,6 +29,7 @@
   ft.py events [--days 365]                 近一年市場重大事件（指數大波動、Fed 決策）＋AI 摘要
   ft.py chain [CoWoS | 散熱 | 奇鋐]          供應鏈：各環節今日漲跌／某環節的上下游與成分股
   ft.py forecast 0050 [--days 30]           TimesFM 趨勢預測（中位數、80% 區間、回測）
+  ft.py kronos 0050 [--days 30]             Kronos K 線預測（抽樣路徑的中位數、80% 區間、收高比例、回測）
   ft.py decide 2330 [--days 20]             Laya 交易判斷：買進／持有／觀望／賣出／放空 各幾 %（5/20/60 日）
   ft.py strategy [內建策略名稱 | "中文選股想法"] [--no-backtest]   選股名單＋回測（空白＝列出內建策略）
   ft.py world [2603 | --region 台灣,紅海]    現實世界訊號（God's Eye View：地震、軍機、航運、氣旋）
@@ -144,6 +145,8 @@ def main():
         out = call("chain", {"q": words}, timeout=120)
     elif c == "forecast":
         out = call("forecast", {"q": words, "h": a.days}, timeout=600)
+    elif c in ("kronos", "k線", "K線"):
+        out = call("kronos", {"q": words, "h": a.days}, timeout=600)
     elif c in ("strategy", "screen"):
         out = call("strategy", {"q": words, "backtest": "0" if a.no_backtest else "1"}, timeout=900)
     elif c in ("decide", "laya"):

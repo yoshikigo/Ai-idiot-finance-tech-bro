@@ -30,6 +30,8 @@ n=$(curl -fsS "$B/api/funds/status" | j "d['funds']") && [[ $n -gt 1000 ]] && ok
 r=$(g api/agent/fund/search q=統一 | head -n 2 | tail -n 1) && ok "基金搜尋：${r:0:60}" || bad "基金搜尋失敗"
 n=$(curl -fsS "$B/api/news?s=2330.TW" | j "len(d)") && [[ $n -gt 0 ]] && ok "中文新聞 2330：$n 則" || bad "中文新聞（Google News）：$n 則"
 r=$(curl -fsS "$B/api/agent/market" | head -n 2 | tail -n 1) && ok "agent API：${r:0:70}" || bad "agent API 失敗"
+echo "   Kronos（第一次會下載權重，最多等 10 分鐘）…"
+r=$(curl -fsS -m 600 "$B/api/kronos?s=0050.TW&h=20&backtest=true" | j "f\"{d['model']} 20日 {d['summary']['change_pct']:+.2f}% 80%區間 {d['summary']['p10_end']:.2f}~{d['summary']['p90_end']:.2f} {d['summary']['p_up']*100:.0f}%路徑收高 回測MAPE {d['backtest']['mape']:.2f}% vs 基準 {d['backtest']['naive_mape']:.2f}%\"") && ok "Kronos：$r" || bad "Kronos 預測失敗（journalctl --user -u ft-kronos -n 50）"
 echo "   TimesFM（第一次會下載權重，最多等 10 分鐘）…"
 r=$(curl -fsS -m 600 "$B/api/forecast?s=0050.TW&h=20&backtest=true" | j "f\"{d['model']} 20日 {d['summary']['change_pct']:+.2f}% 80%區間 {d['summary']['p10_end']:.2f}~{d['summary']['p90_end']:.2f} 回測MAPE {d['backtest']['mape']:.2f}% vs 基準 {d['backtest']['naive_mape']:.2f}%\"") && ok "TimesFM：$r" || bad "TimesFM 預測失敗（journalctl --user -u ft-timesfm -n 50）"
 

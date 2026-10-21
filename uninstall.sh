@@ -5,7 +5,7 @@
 #   --hermes  also remove the fin-terminal Hermes skill and restart Hermes
 set -euo pipefail
 QDIR="$HOME/.config/containers/systemd"
-UNITS=(fin-terminal ft-fingpt ft-research ft-tradingagents ft-hedgefund ft-qlib ft-finrl ft-timesfm ft-laya gods-eye-view)
+UNITS=(fin-terminal ft-fingpt ft-research ft-tradingagents ft-hedgefund ft-qlib ft-finrl ft-timesfm ft-laya ft-kronos gods-eye-view)
 for u in "${UNITS[@]}"; do
   systemctl --user stop "$u.service" 2>/dev/null || true
   rm -f "$QDIR/$u.container"
@@ -16,7 +16,7 @@ systemctl --user daemon-reload
 echo "units removed (incl. gods-eye-view, ft-obsidian-apply)"
 for a in "$@"; do
   case "$a" in
-    --images) podman rmi -f localhost/fin-terminal localhost/ft-tradingagents localhost/ft-hedgefund localhost/ft-qlib localhost/ft-finrl localhost/ft-timesfm localhost/ft-laya localhost/gods-eye-view 2>/dev/null || true; echo "images removed" ;;
+    --images) podman rmi -f localhost/fin-terminal localhost/ft-tradingagents localhost/ft-hedgefund localhost/ft-qlib localhost/ft-finrl localhost/ft-timesfm localhost/ft-laya localhost/ft-kronos localhost/gods-eye-view 2>/dev/null || true; echo "images removed" ;;
     --purge) podman volume rm -f fin-terminal-data 2>/dev/null || true; echo "volume fin-terminal-data removed" ;;
     --hermes) podman unshare rm -rf "$HOME/.hermes/skills/fin-terminal" && systemctl --user restart hermes.service && echo "Hermes skill removed" ;;
   esac

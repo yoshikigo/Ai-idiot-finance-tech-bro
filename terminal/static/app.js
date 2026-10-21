@@ -65,12 +65,12 @@ const KIT_TABS = [["tech", "技術面"], ["options", "選擇權"], ["research", 
 const KIT_WORD = { "技術": "tech", "技術面": "tech", "技術分析": "tech", "選擇權": "options", "期權": "options", "評等": "research", "籌碼": "research", "目標價": "research", "法人": "research", "財報季": "earnings", "EPS": "earnings", "法說": "earnings", "價值": "value", "價值投資": "value", "情報": "intel", "類股輪動": "intel", "市場情報": "intel", "工具箱": "tech" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
 const MON_TITLE = { SECTOR: "產業分布", TWFX: "台幣匯率", MACRO: "美國總經（FRED）", TWMACRO: "台灣總經", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
-const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
+const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", KR: "kronos", KRONOS: "kronos", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
 const ZH_CMD = { "產業": "SECTOR", "產業分布": "SECTOR", "類股": "SECTOR", "美股產業": "SECTOR", "台股產業": "SECTOR", "台灣總經": "TWMACRO", "台經": "TWMACRO", "國內總經": "TWMACRO", "景氣燈號": "TWMACRO", "燈號": "TWMACRO", "景氣": "TWMACRO", "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
   "持股": "HOLD", "我的持股": "HOLD", "庫存": "HOLD", "登入": "HOLD", "走勢": "GP", "K線": "GP", "線圖": "GP", "盤中": "GIP", "概況": "DES", "資料": "DES", "新聞": "N", "財報": "FA",
   "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "TWFX", "台幣": "TWFX", "台幣匯率": "TWFX", "換匯": "TWFX", "商品": "CMDTY", "原物料": "CMDTY",
   "利率": "RATES", "加密": "CRYPTO", "說明": "HELP", "幫助": "HELP", "研究": "LAB", "策略": "LAB", "回測": "LAB", "選股": "LAB", "策略研究": "LAB", "資料庫": "DATA", "目錄": "DATA", "基金": "FUND", "熱門ETF": "TWETF", "ETF排行": "ETF",
-  "分析": "TA", "多代理": "TA", "大師": "HF", "量化": "QLIB", "強化學習": "RL", "預測": "FG", "情緒": "FG", "趨勢": "TFM", "趨勢預測": "TFM", "判斷": "LAYA", "買賣": "LAYA", "多空": "LAYA", "LAYA": "LAYA", "問": "ASK", "設定": "SET", "定期定額": "DCA", "定額": "DCA" };
+  "分析": "TA", "多代理": "TA", "大師": "HF", "量化": "QLIB", "強化學習": "RL", "預測": "FG", "情緒": "FG", "趨勢": "TFM", "趨勢預測": "TFM", "K線預測": "KR", "k線預測": "KR", "Kronos": "KR", "判斷": "LAYA", "買賣": "LAYA", "多空": "LAYA", "LAYA": "LAYA", "問": "ASK", "設定": "SET", "定期定額": "DCA", "定額": "DCA" };
 const alias = (w) => ZH_CMD[w] || ZH_CMD[(w || "").toUpperCase()] || (w || "").toUpperCase();
 
 async function resolveSec(text) {
@@ -157,7 +157,7 @@ function buildFkeys() {
   const keys = [
     ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["TWMACRO", "台經"], ["SECTOR", "產業"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
     ["CMDTY", "商品"], ["RATES", "利率"], ["CRYPTO", "加密"], "|", ["GP", "走勢"], ["GIP", "盤中"], ["DES", "概況"], ["N", "新聞"], ["FA", "財報"], "|",
-    ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
+    ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["KR", "K線預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
   ];
   const nav = $("#fkeys");
   for (const k of keys) {
@@ -435,7 +435,7 @@ function decisionCard(d, compact) {
   card.append(h("div", { class: "dec-sec" }, `${d.horizon} 個交易日後的位置`), hist);
   if (!compact) return card;
   const f = d.facts || {};
-  const used = [].concat(f.timesfm ? [f.timesfm] : [], f.agents || [], (f.world || []).map((x) => "🌐 " + x), (f.ft || []).map((x) => "📊 " + x));
+  const used = [].concat(f.timesfm ? [f.timesfm] : [], f.kronos ? [f.kronos] : [], f.agents || [], (f.world || []).map((x) => "🌐 " + x), (f.ft || []).map((x) => "📊 " + x));
   if (used.length) card.append(h("details", { class: "dec-in" }, h("summary", {}, `帶入的訊號（${used.length}）`), h("ul", {}, ...used.map((x) => h("li", {}, x)))));
   card.append(h("div", { class: "dec-warn" }, "Laya 是通用決策模型，未用金融資料訓練；百分比是它對這份狀態的信心，不是統計漲跌機率。用「📝 記錄」累積後，Obsidian「AI 預測回顧」會算它的實際命中率。" + (d.model.includes("假模型") ? "（目前是測試用假模型）" : "")));
   return card;
@@ -826,6 +826,9 @@ async function renderGP(i, body, p) {
     fcBar.append(h("button", { class: p.fc ? "on fc-btn" : "fc-btn", title: "TimesFM 時間序列基礎模型預測（只看過去價格）",
       onclick: () => { S.panes[i].fc = p.fc ? 0 : (p.fcH || 30); renderPane(i); } }, "🔮 預測"));
     if (p.fc) [10, 30, 60, 120].forEach((d) => fcBar.append(h("button", { class: p.fc === d ? "on" : "", onclick: () => { S.panes[i].fc = S.panes[i].fcH = d; renderPane(i); } }, d + "日")));
+    fcBar.append(h("button", { class: p.kr ? "on kr-btn" : "kr-btn", title: "Kronos K 線基礎模型：抽樣多條未來的開高低收路徑，畫出中位 K 棒與 80% 區間（只看過去 K 線）",
+      onclick: () => { S.panes[i].kr = p.kr ? 0 : (p.krH || 20); renderPane(i); } }, "🕯 Kronos"));
+    if (p.kr) [10, 20, 60].forEach((d) => fcBar.append(h("button", { class: p.kr === d ? "on" : "", onclick: () => { S.panes[i].kr = S.panes[i].krH = d; renderPane(i); } }, d + "日")));
     ranges.append(fcBar);
     ranges.append(h("button", { class: majorOn(p) ? "on mev-btn" : "mev-btn", title: "市場重大事件：指數大漲大跌、Fed 利率決策、你自己加的事件（滑到標記看說明，點標記開「大事」頁）",
       onclick: () => { S.panes[i].mev = !majorOn(p); renderPane(i); } }, "📌 大事"));
@@ -847,6 +850,7 @@ async function renderGP(i, body, p) {
       <span class="meta">區間 <span class="${cls(rchg)}">${pct(rchg)}</span> · 高 ${nf(Math.max(...rows.map((r) => r.high)), pxd(last))} · 低 ${nf(Math.min(...rows.map((r) => r.low)), pxd(last))}${q && q.lots != null ? " · 量 " + nf(q.lots, 0) + " 張" : ""}${q && q.currency ? " · " + q.currency : ""}${q && q.indicative ? " · 試算價" : ""}</span>`;
     drawCandles(i, box, rows, !intraday);
     if (p.fc && !intraday) overlayForecast(i, p.sec, p.fc, legend);
+    if (p.kr && !intraday) { const kl = h("span", { class: "legend kr-legend" }); ranges.append(kl); overlayKronos(i, p.sec, p.kr, kl); }
     if (p.ev && !intraday) overlayEvents(i, p.sec, rows);
     if (majorOn(p) && !intraday) overlayMajor(i, p.sec, rows);
     if (p.focusDate && !intraday) { focusChartOn(i, p.focusDate); S.panes[i].focusDate = null; }
@@ -1007,6 +1011,30 @@ function drawForecast(chart, d) {
   const med = chart.addLineSeries({ color: "#ffa028", lineWidth: 2, lineStyle: 2, priceLineVisible: false, title: "TimesFM" });
   med.setData([start, ...d.forecast.map((x) => ({ time: x.date, value: x.median }))]);
   chart.timeScale().fitContent();
+}
+
+/* ---------- Kronos overlay：中位路徑的 K 棒（半透明）＋ 收盤 P10–P90 */
+async function overlayKronos(i, sec, horizon, legend) {
+  legend.textContent = "Kronos 抽樣中…（第一次要載入模型）";
+  let d;
+  try { d = await api(`/api/kronos?s=${encodeURIComponent(sec)}&h=${horizon}`); }
+  catch (e) { legend.innerHTML = `<span class="down">Kronos 失敗：${esc(e.message).slice(0, 80)}</span>`; return; }
+  const c = S.charts.get(i);
+  if (!c || S.panes[i].sec !== sec) return;
+  const up = cssVar("--up"), dn = cssVar("--down");
+  const k = c.chart.addCandlestickSeries({ upColor: up + "66", downColor: dn + "66", borderUpColor: up, borderDownColor: dn,
+    wickUpColor: up + "aa", wickDownColor: dn + "aa", priceLineVisible: false, lastValueVisible: false, title: "Kronos" });
+  k.setData(d.forecast.map((x) => ({ time: x.date, open: x.open, high: x.high, low: x.low, close: x.close })));
+  const start = { time: d.last_date, value: d.last };
+  for (const key of ["p90", "p10"]) {
+    const l = c.chart.addLineSeries({ color: "#c084fc", lineWidth: 1, lineStyle: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
+    l.setData([start, ...d.forecast.map((x) => ({ time: x.date, value: x[key] }))]);
+  }
+  c.chart.timeScale().fitContent();
+  const sm = d.summary;
+  legend.innerHTML = `${esc(d.model)} ${d.horizon}日：收盤中位數 <b class="${cls(sm.change_pct)}">${nf(sm.median_end, pxd(sm.median_end))}（${pct(sm.change_pct)}）</b>
+    · 80% ${nf(sm.p10_end, pxd(sm.p10_end))}–${nf(sm.p90_end, pxd(sm.p90_end))} · ${Math.round(sm.p_up * 100)}% 路徑收高`;
+  legend.title = `Kronos 抽樣 ${d.samples} 條路徑：半透明 K 棒是中位路徑，紫色虛線是收盤 P10／P90。只看過去 K 線，不含新聞與基本面。`;
 }
 
 /* ---------- DES */
@@ -1552,6 +1580,7 @@ function renderHelp(i, body) {
     <tr><td>強化學習 2330 2317（RL）</td><td>FinRL 強化學習交易</td></tr>
     <tr><td>預測 NVDA（FG）</td><td>FinGPT 下週預測／新聞情緒</td></tr>
     <tr><td>走勢圖的 🔮 預測（或 趨勢 2330）</td><td>TimesFM 時間序列預測：圖上畫中位數與 80% 區間；側欄分頁有回測與解讀</td></tr>
+    <tr><td>走勢圖的 🕯 Kronos（或 K線預測 2330、KR 2330）</td><td>Kronos K 線基礎模型：抽樣多條未來的開高低收路徑，圖上畫中位路徑 K 棒與收盤 80% 區間；側欄 Kronos 分頁有回測與解讀</td></tr>
     <tr><td>問 台積電毛利率怎麼看？（ASK）</td><td>帶著目前視窗的標的（股票、ETF、基金）資料問 AI</td></tr>
     <tr><td>設定（SET）</td><td>Ollama、模型、漲跌顏色</td></tr>
     <tr><td>Ctrl+B</td><td>開關 AI 側欄</td></tr>
@@ -1622,7 +1651,7 @@ function setupResizer() {
   });
 }
 
-const SHORT = { research: "策略回測", tradingagents: "TradingAgents", hedgefund: "大師基金", qlib: "Qlib", finrl: "FinRL", fingpt: "FinGPT", timesfm: "TimesFM", laya: "Laya 判斷" };
+const SHORT = { research: "策略回測", tradingagents: "TradingAgents", hedgefund: "大師基金", qlib: "Qlib", finrl: "FinRL", fingpt: "FinGPT", timesfm: "TimesFM", kronos: "Kronos", laya: "Laya 判斷" };
 
 async function loadEngines() {
   try { S.engines = await api("/api/engines"); } catch (e) { S.engines = []; }
@@ -2025,8 +2054,10 @@ async function renderSettings(body) {
     <div class="row"><label>Qlib 解讀</label>${sel("m_qlib", m.qlib, true)}</div>
     <div class="row"><label>FinRL 解讀</label>${sel("m_finrl", m.finrl, true)}</div>
     <div class="row"><label>TimesFM 解讀</label>${sel("m_timesfm", m.timesfm, true)}</div>
+    <div class="row"><label>Kronos 解讀</label>${sel("m_kronos", m.kronos, true)}</div>
     <div class="row"><label>策略研究 AI</label>${sel("m_research", m.research, true)}</div>
     <div class="row"><label>TimesFM 模型</label><select name="timesfm_model"><option value="2.5" ${(s.timesfm_model || "2.5") === "2.5" ? "selected" : ""}>TimesFM 2.5（200M，Apache-2.0）</option><option value="3.0" ${s.timesfm_model === "3.0" ? "selected" : ""}>TimesFM 3.0（330M，權重限非商業用途）</option></select></div>
+    <div class="row"><label>Kronos 模型</label><select name="kronos_model">${[["mini", "Kronos-mini（4.1M，最快）"], ["small", "Kronos-small（24.7M）"], ["base", "Kronos-base（102.3M，較準較慢）"]].map(([v, l]) => `<option value="${v}" ${(s.kronos_model || "small") === v ? "selected" : ""}>${l}</option>`).join("")}</select></div>
     <div class="row"><label>ASK 對話</label>${sel("m_ask", m.ask, true)}</div>
     <div class="run-row" style="margin-top:10px;display:flex;gap:8px;align-items:center"><button class="btn" id="saveSet">儲存</button><span class="hint" id="setMsg"></span></div>
     <p class="hint" style="margin-top:10px">TradingAgents 需要支援 tool calling 且 context ≥ 32K 的模型（例如 qwen3:32b，或其他 ≥ 32K context 的模型）。一張 24 GB 顯卡通常只放得下一個 27–32B 模型，引擎之間用不同模型會互相換載，第一次會變慢。</p>
@@ -2035,11 +2066,11 @@ async function renderSettings(body) {
   $("#saveSet", wrap).addEventListener("click", async () => {
     const g = (n) => $(`[name="${n}"]`, wrap).value;
     const models = {};
-    for (const k of ["tradingagents_deep", "tradingagents_quick", "hedgefund", "fingpt", "qlib", "finrl", "timesfm", "research", "ask"]) models[k] = g("m_" + k);
+    for (const k of ["tradingagents_deep", "tradingagents_quick", "hedgefund", "fingpt", "qlib", "finrl", "timesfm", "kronos", "research", "ask"]) models[k] = g("m_" + k);
     try {
       S.settings = await api("/api/settings", { method: "PUT", json: {
         ollama_url: g("ollama_url").trim(), model: g("model"), num_ctx: g("num_ctx") ? +g("num_ctx") : null,
-        temperature: +g("temperature"), think: g("think") === "true", language: g("language"), color_mode: g("color_mode"), timesfm_model: g("timesfm_model"), obsidian_auto: g("obsidian_auto") === "true", models } });
+        temperature: +g("temperature"), think: g("think") === "true", language: g("language"), color_mode: g("color_mode"), timesfm_model: g("timesfm_model"), kronos_model: g("kronos_model"), obsidian_auto: g("obsidian_auto") === "true", models } });
       applyColors(); S.panes.forEach((_, i) => renderPane(i)); tape();
       $("#setMsg", wrap).textContent = "已儲存 ✓";
       updateStatus();
@@ -3132,7 +3163,7 @@ function evAddForm(i) {
 
 
 /* ---------- 分析紀錄與檢討 */
-const LG_ENG = ["tradingagents", "hedgefund", "fingpt", "timesfm", "laya", "qlib", "finrl", "research"];
+const LG_ENG = ["tradingagents", "hedgefund", "fingpt", "timesfm", "kronos", "laya", "qlib", "finrl", "research"];
 const LG_LLM = ["tradingagents", "hedgefund", "fingpt"];
 
 async function renderLedger(i, body, p) {

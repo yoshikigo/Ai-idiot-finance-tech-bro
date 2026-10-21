@@ -1,7 +1,7 @@
 """
 title: FT Terminal 金融終端
 author: fin-terminal
-version: 0.17.0
+version: 0.18.0
 description: 台股／美股即時報價、台股 ETF（淨值、折溢價、配息、成分股、排行）、境內外基金淨值、市場總覽、今日焦點、供應鏈地圖（含美國同類對照）、市場重大事件、中文新聞、世界事件、TimesFM 預測、Laya 判斷、策略選股，以及本機 AI 投資分析（TradingAgents、FinGPT、投資大師、Qlib、FinRL）。資料來自自架的 FT Terminal（不含任何人的持股）。
 required_open_webui_version: 0.5.0
 """
@@ -355,6 +355,19 @@ class Tools:
         """
         await self._status(__event_emitter__, f"新聞：{query}")
         out = await self._get("news", {"q": query, "n": 12})
+        await self._status(__event_emitter__, "完成", True)
+        return out
+
+    async def kronos_forecast(self, query: str, days: int = 20, __event_emitter__: Emitter = None) -> str:
+        """
+        Kronos K 線基礎模型預測：抽樣多條未來的開高低收路徑，給出收盤中位數、80% 區間、收高的路徑比例、中位路徑的最高最低與回測。
+        只看過去的 K 線，不含新聞與基本面。和 TimesFM 互相參照。
+        :param query: 標的（中文名稱或代號，例：台積電、0050、NVDA、^TWII、BTC-USD）
+        :param days: 預測幾個交易日（5–120）
+        :return: 多行文字
+        """
+        await self._status(__event_emitter__, f"Kronos 預測 {query}")
+        out = await self._get("kronos", {"q": query, "h": days}, timeout=600)
         await self._status(__event_emitter__, "完成", True)
         return out
 

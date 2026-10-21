@@ -391,6 +391,37 @@ async def forecast(q: str, h: int = 30, model: str = "", plain: bool = False, fo
     return _out("\n".join(lines), plain, d, format)
 
 
+@router.get("/kronos")
+async def kronos_forecast(q: str, h: int = 20, model: str = "", plain: bool = False, format: str = "text"):  # noqa: A002
+    """Kronos K 線預測：抽樣多條未來開高低收路徑 → 中位數、80% 區間、收高路徑比例、回測（CPU，不用 LLM）。"""
+    sym = await asyncio.to_thread(context.resolve, q)
+    if not sym:
+        raise HTTPException(404, f"找不到「{q}」")
+    url = _hooks["engines"].get("kronos")
+    model = model or _hooks["load_settings"]().get("kronos_model", "small")
+    try:
+        async with httpx.AsyncClient(timeout=600) as c:
+            r = await c.get(f"{url}/forecast", params={"symbol": sym, "horizon": h, "model": model, "samples": 24, "backtest": "true"})
+    except httpx.HTTPError as e:
+        raise HTTPException(503, f"Kronos 引擎離線：{e}") from e
+    if r.status_code >= 400:
+        raise HTTPException(r.status_code, r.text)
+    d = r.json()
+    sm, bt = d["summary"], d.get("backtest")
+    f = lambda v: f"{v:,.4f}" if abs(v) < 10 else f"{v:,.2f}"  # noqa: E731
+    pts = d["forecast"]
+    marks = sorted({min(len(pts), k) for k in (5, 10, 20, len(pts))})
+    lines = [f"【{d['model']} K 線預測】{sym} {d['name']}",
+             f"最新 {f(d['last'])}（{d['last_date']}），預測 {d['horizon']} 個交易日，用 {d['context']} 根 K 棒、{d['samples']} 條抽樣路徑",
+             f"{d['horizon']} 日後收盤中位數 {f(sm['median_end'])}（{sm['change_pct']:+.2f}%），80% 區間 {f(sm['p10_end'])} ~ {f(sm['p90_end'])}，"
+             f"{sm['p_up'] * 100:.0f}% 的路徑收高；中位路徑最高 {sm['path_high_pct']:+.1f}%、最低 {sm['path_low_pct']:+.1f}%",
+             "路徑：" + "｜".join(f"{pts[k - 1]['date']} {f(pts[k - 1]['median'])}（{f(pts[k - 1]['p10'])}~{f(pts[k - 1]['p90'])}）" for k in marks)]
+    if bt:
+        lines.append(f"回測（{bt['from']} 之後）：MAPE {bt['mape']:.2f}%（價格不變基準 {bt['naive_mape']:.2f}%），落在 80% 區間 {bt['coverage80']:.0f}%，方向{'正確' if bt['direction_hit'] else '錯誤'}")
+    lines.append("註：Kronos 只看過去的 K 線（開高低收量），不含新聞與基本面；區間來自抽樣路徑的分散，不是保證。")
+    return _out("\n".join(lines), plain, d, format)
+
+
 @router.get("/decide")
 async def decide(q: str, h: int = 20, plain: bool = False, format: str = "text"):  # noqa: A002
     """Laya 交易判斷：買進／持有／觀望／賣出／放空 的百分比（ONNX，約 1 秒，不用 LLM）."""
@@ -472,6 +503,7 @@ ENGINE_ALIASES = {"tradingagents": "tradingagents", "ta": "tradingagents", "交�
                   "qlib": "qlib", "量化": "qlib", "finrl": "finrl", "rl": "finrl", "強化學習": "finrl",
                   "fingpt": "fingpt", "fg": "fingpt", "預測": "fingpt", "情緒": "fingpt",
                   "timesfm": "timesfm", "tfm": "timesfm", "趨勢": "timesfm", "走勢預測": "timesfm",
+                  "kronos": "kronos", "kr": "kronos", "k線": "kronos", "K線": "kronos", "k線預測": "kronos", "K線預測": "kronos",
                   "laya": "laya", "判斷": "laya", "買賣": "laya"}
 
 
@@ -490,7 +522,7 @@ async def analyze(req: Request):
         if bad:
             raise HTTPException(404, "找不到：" + "、".join(bad))
         syms = [s for s in syms if not s.startswith(context.FUND_PREFIX)]
-        if eng in ("tradingagents", "fingpt", "timesfm", "laya"):
+        if eng in ("tradingagents", "fingpt", "timesfm", "kronos", "laya"):
             params.setdefault("ticker", syms[0])
         elif eng == "qlib":
             params.setdefault("universe", "custom")
@@ -625,7 +657,8 @@ HELP = """FT Terminal agent API（全部 GET，除了 analyze）
 /api/agent/chain   /api/agent/chain?q=CoWoS        供應鏈：各環節今日漲跌／某環節（或某檔股票所在環節）的上下游與成分股
 /api/agent/world?q=2603  或 ?region=台灣,紅海      現實世界訊號（God's Eye View：地震、軍機、航運、氣旋）
 /api/agent/review                                 AI 預測回顧（過去的預測準不準）
-POST /api/agent/analyze {"engine":"tradingagents","q":"2330"}   啟動 AI 分析（tradingagents|hedgefund|qlib|finrl|fingpt|timesfm|laya）
+/api/agent/kronos?q=0050&h=20                     Kronos K 線預測（抽樣路徑的中位數、80% 區間、收高比例、回測）
+POST /api/agent/analyze {"engine":"tradingagents","q":"2330"}   啟動 AI 分析（tradingagents|hedgefund|qlib|finrl|fingpt|timesfm|kronos|laya）
 /api/agent/job?engine=tradingagents&id=…&wait=600 等結果（PENDING / DONE）
 /api/agent/jobs                                   最近的工作
 共通參數：plain=1 去掉 Markdown（LINE 用）、format=json

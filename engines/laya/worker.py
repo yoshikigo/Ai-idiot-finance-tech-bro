@@ -42,6 +42,7 @@ from ft_common.engine import DATA, Ctx, Engine, jsonable, serve, split_tickers, 
 
 SIDECAR = Path(os.environ.get("LAYA_SIDECAR", Path(__file__).with_name("sidecar") / "server.mjs"))
 TIMESFM_URL = os.environ.get("FT_TIMESFM_URL", "http://127.0.0.1:8136").rstrip("/")
+KRONOS_URL = os.environ.get("FT_KRONOS_URL", "http://127.0.0.1:8139").rstrip("/")
 MAX_LEN = 512
 
 ACTIONS = {  # option → (description shown to the model, 中文標籤)
@@ -61,7 +62,7 @@ SCHEMA = [
      "options": [{"value": "5", "label": "一週（5 個交易日）"}, {"value": "20", "label": "一個月（20 個交易日）"},
                  {"value": "60", "label": "一季（60 個交易日）"}]},
     {"name": "use_agents", "label": "加入其他 AI 引擎最近的結論（TradingAgents、大師基金、FinGPT）", "type": "bool", "default": True},
-    {"name": "use_timesfm", "label": "加入 TimesFM 預測（只在基準日＝今天時）", "type": "bool", "default": True},
+    {"name": "use_timesfm", "label": "加入 TimesFM 與 Kronos 預測（只在基準日＝今天時）", "type": "bool", "default": True},
     {"name": "use_world", "label": "加入現實世界事件（God's Eye View）", "type": "bool", "default": True},
     {"name": "use_news", "label": "加入英文新聞標題", "type": "bool", "default": True},
     {"name": "use_ft", "label": "加入 FT 市場背景（籌碼、月營收、總經、產業強弱、即將公布的事件）", "type": "bool", "default": True},
@@ -204,7 +205,7 @@ def agent_lines(sym: str, as_of: str, days: int = 14) -> list[str]:
     start = (dt.date.fromisoformat(as_of) - dt.timedelta(days=days)).isoformat()
     best: dict[str, tuple[str, str]] = {}
     for eng, label in (("tradingagents", "TradingAgents"), ("hedgefund", "AI hedge fund (investor personas)"),
-                       ("fingpt", "FinGPT"), ("timesfm", "TimesFM job")):
+                       ("fingpt", "FinGPT"), ("timesfm", "TimesFM job"), ("kronos", "Kronos job")):
         d = DATA / eng / "jobs"
         if not d.exists():
             continue
@@ -235,6 +236,17 @@ def timesfm_line(sym: str, h: int) -> str | None:
         sm, last = r.json()["summary"], r.json()["last"]
         return (f"TimesFM {h}-day forecast: median {sm['change_pct']:+.1f}%, P(higher) {sm['p_up'] * 100:.0f}%, "
                 f"80% band {_pct(sm['p10_end'], last):+.1f}% to {_pct(sm['p90_end'], last):+.1f}%")
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def kronos_line(sym: str, h: int) -> str | None:
+    try:
+        r = httpx.get(f"{KRONOS_URL}/forecast", params={"symbol": sym, "horizon": h, "samples": 16}, timeout=180, trust_env=False)
+        r.raise_for_status()
+        sm, last = r.json()["summary"], r.json()["last"]
+        return (f"Kronos candlestick-model {h}-day forecast: median close {sm['change_pct']:+.1f}%, {sm['p_up'] * 100:.0f}% of sampled "
+                f"paths end higher, 80% band {_pct(sm['p10_end'], last):+.1f}% to {_pct(sm['p90_end'], last):+.1f}%")
     except Exception:  # noqa: BLE001
         return None
 
@@ -300,6 +312,10 @@ def build_state(sym: str, as_of: str, h: int, use_agents=True, use_timesfm=True,
         if tl:
             sigs.append(tl)
             facts["timesfm"] = tl
+        kl = kronos_line(sym, h)
+        if kl:
+            sigs.append(kl)
+            facts["kronos"] = kl
     if use_agents:
         al = agent_lines(sym, as_of)
         sigs += al
@@ -402,8 +418,8 @@ def report(d: dict) -> dict:
     md += [f"| {lab}（{b}） | {p * 100:.1f}% |" for lab, b, p in zip(d["outlook"]["labels"], d["outlook"]["bins"], d["outlook"]["probabilities"])]
     md += ["", f"期望等級 {d['outlook']['score']:.2f}（0＝大跌 … 4＝大漲，2＝持平）", ""]
     f = d["facts"]
-    if f.get("agents") or f.get("timesfm"):
-        md += ["### 帶入的其他 AI 結論", ""] + [f"- {x}" for x in ([f["timesfm"]] if f.get("timesfm") else []) + f.get("agents", [])] + [""]
+    if f.get("agents") or f.get("timesfm") or f.get("kronos"):
+        md += ["### 帶入的其他 AI 結論", ""] + [f"- {x}" for x in [f[k] for k in ("timesfm", "kronos") if f.get(k)] + f.get("agents", [])] + [""]
     if f.get("world"):
         md += ["### 帶入的世界事件（7 天）", ""] + [f"- {x}" for x in f["world"]] + [""]
     if f.get("ft"):
