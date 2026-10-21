@@ -114,8 +114,8 @@ def test_cbc_tables_and_unemp_fallback(monkeypatch):
     h = tm.history("DISCOUNT", 1)
     assert h["step"] and h["points"][-1]["value"] == 2.0 and len(h["points"]) == 2  # level at left edge + today
     assert tm.raw("M2").iloc[-1] == 6.79
-    with pytest.raises(RuntimeError, match="M1B"):
-        tm.raw("M1B")
+    with pytest.raises(Exception):
+        tm.raw("M1B")  # no statistical-database answer → explicit error (M2 still falls back to the front-page table)
     u = tm.raw("UNEMP")
     assert u.iloc[-1] == 3.27 and "勞動部" in tm._diag["unemp"]
 
@@ -144,3 +144,37 @@ def test_api_and_agent(tmp_path, monkeypatch):
     t = c.get("/api/agent/twmacro").text
     assert "台灣總經" in t and "景氣對策信號" in t and "重貼現率" in t
     assert "series" in c.get("/api/twmacro/diag").json()
+
+
+MONEY = {"meta": {"filename": "EF15M01en"}, "data": {"dataSets": [
+    ["2025M08", "1000", "3.0", "5", "-", "200000", "4.1", "288000", "5.20", "662000", "5.50"],
+    ["2026M07", "1100", "3.5", "5", "-", "210000", "4.6", "305000", "7.10", "703000", "7.42"],
+    ["2026M08", "1110", "3.6", "6", "-", "212000", "4.8", "307508", "6.65", "706780", "6.79"]]}}
+
+
+def test_money_from_cbc_api(monkeypatch):
+    from ft_common import market, twmacro as tm
+    d = tm.parse_money(MONEY)
+    assert d["M1B"].iloc[-1] == 6.65 and d["M2"].iloc[-1] == 6.79 and d["M1B"].index[-1] == pd.Timestamp(2026, 8, 1)
+    bad = {"data": {"dataSets": [[f"2026M0{i}", "9", "1", "1", "1", "9", "1", "1", "1", "5", "1"] for i in range(1, 8)]}}
+    with pytest.raises(RuntimeError):
+        tm.parse_money(bad)  # columns not in M1A < M1B < M2 order → refuse rather than show the wrong series
+    monkeypatch.setattr(market, "FAKE", False)
+    monkeypatch.setattr(tm, "_get", lambda url, **kw: json.dumps(MONEY).encode())
+    market._cache.clear(); tm._neg.clear()
+    assert tm.raw("M1B").iloc[-1] == 6.65 and tm.raw("M2").iloc[-1] == 6.79 and "EF15M01en" in tm._diag["money"]
+
+
+def test_cpi_skips_zero_padded_tables(monkeypatch):
+    from ft_common import market, twmacro as tm
+    old = {"data": {"structure": {"dimensions": {"series": [{"values": [{"name": "總指數"}]}],
+           "observation": [{"values": [{"id": f"{y}-M{m}"} for y in (2021, 2022, 2023) for m in range(1, 13)]}]}},
+           "dataSets": [{"series": {"0": {"observations": {str(k): [100 + k if k < 24 else 0] for k in range(36)}}}}]}}
+    new = {"data": {"structure": {"dimensions": {"series": [{"values": [{"name": "總指數"}]}],
+           "observation": [{"values": [{"id": f"{y}-M{m}"} for y in (2024, 2025, 2026) for m in range(1, 13)]}]}},
+           "dataSets": [{"series": {"0": {"observations": {str(k): [100 + k * 0.2] for k in range(33)}}}}]}}
+    monkeypatch.setattr(market, "FAKE", False)
+    monkeypatch.setattr(tm, "_get", lambda url, **kw: json.dumps(old if "A030101019" in url else new).encode())
+    market._cache.clear(); tm._neg.clear()
+    c = tm.raw("CPI")
+    assert c.index[-1] == pd.Timestamp(2026, 9, 1) and (c > -50).all()  # never the -100% of a zero-padded table

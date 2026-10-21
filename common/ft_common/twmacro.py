@@ -7,7 +7,8 @@ Sources (all official, no key):
   chain-linked GDP vs. the same quarter a year earlier), CPI basic groups (A030101019, monthly).
   Core CPI and unemployment tables are looked up by series *name* across candidate tables, because the table
   codes and filter syntax aren't documented; `diag()` reports what was found where.
-- 中央銀行 web tables (cbc.gov.tw lp-*.html): 重貼現率 changes, M2 / M1B 年增率, 金融業隔夜拆款利率.
+- 中央銀行統計資料庫 API（cpx.cbc.gov.tw，EF15M01：貨幣總計數日平均）: M1B / M2 年增率 since 1987.
+- 中央銀行 web tables (cbc.gov.tw lp-*.html): 重貼現率 changes, 金融業隔夜拆款利率 (M2 fallback).
 - 勞動部 每月國內主要經濟指標 (data.gov.tw 13228) as the unemployment fallback (it stopped at 2026-05; the date
   is shown so staleness is visible).
 """
@@ -44,8 +45,8 @@ SERIES = {
     "UNEMP": ("失業率", "%", "就業", "主計總處人力資源調查（季節未調整）", "M"),
     "DISCOUNT": ("央行重貼現率", "%", "貨幣與利率", "中央銀行；每季理監事會決定", "D"),
     "OVERNIGHT": ("金融業隔夜拆款利率", "%", "貨幣與利率", "中央銀行；每日加權平均", "D"),
-    "M1B": ("M1B 年增率", "%", "貨幣與利率", "中央銀行；活期性存款＋通貨，反映股市資金動能", "M"),
-    "M2": ("M2 年增率", "%", "貨幣與利率", "中央銀行；廣義貨幣供給", "M"),
+    "M1B": ("M1B 年增率", "%", "貨幣與利率", "中央銀行（日平均）；活期性存款＋通貨，反映股市資金動能", "M"),
+    "M2": ("M2 年增率", "%", "貨幣與利率", "中央銀行（日平均）；廣義貨幣供給", "M"),
 }
 GROUPS = ["景氣", "物價", "就業", "貨幣與利率"]
 STEP = {"DISCOUNT"}  # changes only on decision dates → draw as steps
@@ -194,46 +195,64 @@ def parse_sdmx(d: dict) -> list[tuple[list[str], pd.Series]]:
     return out
 
 
-SDMX_VARIANTS = ["", "&startTime=2000-M1", "/all", "/1.M&startTime=2000-M1", "/1.Q&startTime=2000-Q1"]
+def _shapes(freq: str) -> list[str]:
+    """Query forms per the DGBAS API doc: <table>/<dim1 codes>.<dim2>….<freq>&startTime=…&endTime=… (both times required;
+    an empty dimension = all codes). The plain <table> query works for small tables only."""
+    y = dt.date.today().year
+    rng = f"&startTime=2000-{freq}1&endTime={y}-{freq}{12 if freq == 'M' else 4}"
+    return ["", *(f"/{f}.{freq}{rng}" for f in ("1", "1.", "1..", "", ".", "..", "..."))]
 
 
-def sdmx(funid: str) -> list[tuple[list[str], pd.Series]]:
-    """Fetch one table, trying the plain query first and then filter forms (some tables answer 參數錯誤 bare)."""
+def sdmx(funid: str, freq: str = "M") -> list[tuple[list[str], pd.Series]]:
+    """Fetch one table: plain query first, then the filtered forms (bigger tables answer 參數錯誤 when bare)."""
     def load():
         why = []
-        for v in SDMX_VARIANTS:
+        for v in _shapes(freq):
             try:
                 body = _get(SDMX.format(funid + v), timeout=90)
             except Exception as e:  # noqa: BLE001
-                why.append(f"{v or '基本'}: {type(e).__name__}")
+                why.append(f"{v.split('&')[0] or '基本'}: {type(e).__name__}")
                 continue
             if body.lstrip()[:1] != b"{":
-                why.append(f"{v or '基本'}: {body[:30].decode('utf-8', 'replace')}")
+                why.append(f"{v.split('&')[0] or '基本'}: {body[:24].decode('utf-8', 'replace').strip()}")
                 continue
             got = parse_sdmx(json.loads(body))
             if got:
-                _diag[f"sdmx:{funid}"] = f"OK（{v or '基本查詢'}，{len(got)} 個序列）"
+                _diag[f"sdmx:{funid}"] = f"OK（{v.split('&')[0] or '基本查詢'}，{len(got)} 個序列）"
                 return got
-            why.append(f"{v or '基本'}: 0 序列")
-        raise RuntimeError(f"主計總處 {funid}：" + "；".join(why))
-    return _guard(f"sdmx:{funid}", load)
+            why.append(f"{v.split('&')[0] or '基本'}: 0 序列")
+        raise RuntimeError(f"主計總處 {funid}：" + "；".join(why[:4]))
+    return _guard(f"sdmx:{funid}:{freq}", load)
 
 
-def _pick(tables: list[str], want, label: str) -> pd.Series:
-    """First series (across candidate tables) whose dimension names satisfy want(names)."""
-    errs = []
+def _pick(tables: list[str], want, label: str, freq: str = "M", positive: bool = False) -> pd.Series:
+    """Across all candidate tables, the matching series that runs the latest (then the longest).
+    positive=True drops zeros/negatives first (an index can't be 0 — discontinued tables pad with 0)."""
+    errs, best = [], None
     for f in tables:
         try:
-            got = sdmx(f)
+            got = sdmx(f, freq)
         except Exception as e:  # noqa: BLE001
-            errs.append(str(e)[:120])
+            errs.append(str(e)[:140])
             continue
-        hits = [(n, s) for n, s in got if want(n)]
-        if hits:
-            n, s = max(hits, key=lambda x: len(x[1]))
-            _diag[label] = f"{f}：{' / '.join(n)}"
-            return s
-        errs.append(f"{f} 沒有符合的序列")
+        hits = 0
+        for n, s in got:
+            if not want(n):
+                continue
+            if positive:
+                s = s[s > 0]
+            if not len(s):
+                continue
+            hits += 1
+            key = (s.index[-1], len(s))
+            if best is None or key > best[0]:
+                best = (key, f, n, s)
+        if not hits:
+            errs.append(f"{f} 沒有符合的序列")
+    if best:
+        _, f, n, s = best
+        _diag[label] = f"{f}：{' / '.join(n)}（到 {s.index[-1]:%Y-%m}）"
+        return s
     raise RuntimeError("；".join(errs) or "沒有來源")
 
 
@@ -246,7 +265,7 @@ def gdp() -> pd.Series:
     def want(n):
         j = " ".join(n)
         return "連鎖實質" in j and re.search(r"GDP|國內生產毛額", j) and "GNI" not in j and "平均每人" not in j
-    lvl = _pick(["A018102060"], want, "gdp")
+    lvl = _pick(["A018102060"], want, "gdp", freq="Q", positive=True)
     full = pd.date_range(lvl.index.min(), lvl.index.max(), freq="QS")
     return _yoy(lvl.reindex(full), 4)
 
@@ -256,18 +275,25 @@ def _monthly_yoy(lvl: pd.Series) -> pd.Series:
     return _yoy(lvl.reindex(full), 12)
 
 
-CPI_TABLES = ["A030101019", "A030101015"]
+CPI_TABLES = ["A030101015", "A030601015", "A030103015", "A030101025", "A030101019"]
+CORE_TABLES = ["A030103015", "A030101015", "A030101025", "A030101019"]
+CORE_RE = re.compile(r"不含.*(蔬|果).*能源|核心")
 
 
 def cpi() -> pd.Series:
-    return _monthly_yoy(_pick(CPI_TABLES, lambda n: bool(n) and n[-1].replace(" ", "") == "總指數", "cpi"))
+    def want(n):
+        j = [x.replace(" ", "") for x in n]
+        return any(x in ("總指數", "消費者物價總指數", "消費者物價指數") or x.endswith("消費者物價總指數") for x in j) and not any(
+            "不含" in x or "年增率" in x for x in j)
+    return _monthly_yoy(_pick(CPI_TABLES, want, "cpi", positive=True))
 
 
 def core() -> pd.Series:
-    return _monthly_yoy(_pick(CPI_TABLES, lambda n: any(re.search(r"不含(新鮮)?蔬果.*能源|核心", x) for x in n), "core"))
+    return _monthly_yoy(_pick(CORE_TABLES, lambda n: any(CORE_RE.search(x.replace(" ", "")) for x in n)
+                              and not any("年增率" in x for x in n), "core", positive=True))
 
 
-UNEMP_TABLES = ["A046101010", "A046101020", "A046102010"]
+UNEMP_TABLES = ["A040108010", "A040109010", "A046101010"]
 
 
 def unemp() -> pd.Series:
@@ -275,7 +301,10 @@ def unemp() -> pd.Series:
         return any("失業率" in x for x in n) and not any(re.search(r"男|女|歲|國中|高中|高職|大專|大學|研究所|地區|縣|市", x)
                                                          for x in n)
     try:
-        return _pick(UNEMP_TABLES, want, "unemp")
+        s = _pick(UNEMP_TABLES, want, "unemp", positive=True)
+        if s.index[-1] < pd.Timestamp(dt.date.today()) - pd.Timedelta(days=150):
+            raise RuntimeError(f"主計總處失業率只到 {s.index[-1]:%Y-%m}")
+        return s
     except Exception as e:  # noqa: BLE001
         first = str(e)
     # fallback: 勞動部 每月國內主要經濟指標 (last 13 months only)
@@ -322,27 +351,52 @@ def overnight() -> pd.Series:
                                                    if len(r) > 1 and (t := _day(r[0])) is not None}))
 
 
+CBC_API = "https://cpx.cbc.gov.tw/API/DataAPI/Get?FileName={}"
+MONEY_FILE = "EF15M01en"  # 貨幣總計數（日平均）月資料：期間, (原始值, 年增率) × …, 最後三組是 M1A、M1B、M2
+
+
+def parse_money(d: dict) -> dict[str, pd.Series]:
+    """CBC statistical-database API-JSON for EF15M01 → {"M1B": yoy, "M2": yoy}. Records are
+    ["1987M05", v1, g1, …, M1A, g, M1B, g, M2, g]; the column order is checked (M1A < M1B < M2 levels)."""
+    data = d.get("data", d)
+    rows = (data.get("dataSets") or [])
+    rows = rows[0] if rows and isinstance(rows[0], list) and rows[0] and isinstance(rows[0][0], list) else rows
+    m1b, m2, bad = {}, {}, 0
+    for r in rows:
+        if not isinstance(r, list) or len(r) < 7:
+            continue
+        m = re.match(r"^(\d{4})M(\d{2})$", str(r[0]))
+        if not m:
+            continue
+        lv = [_num(r[i]) for i in (-6, -4, -2)]
+        if all(v is not None for v in lv) and not (lv[0] <= lv[1] <= lv[2]):
+            bad += 1
+            continue
+        t = pd.Timestamp(int(m.group(1)), int(m.group(2)), 1)
+        m1b[t], m2[t] = _num(r[-3]), _num(r[-1])
+    if bad > 5 or not m1b:
+        raise RuntimeError(f"央行 {MONEY_FILE} 欄位順序和預期不同（{bad} 筆不符）")
+    return {"M1B": _series(m1b), "M2": _series(m2)}
+
+
+def money() -> dict[str, pd.Series]:
+    def load():
+        out = parse_money(json.loads(_get(CBC_API.format(MONEY_FILE), timeout=60, ttl=6 * 3600)))
+        _diag["money"] = f"央行統計資料庫 {MONEY_FILE}（到 {out['M1B'].index[-1]:%Y-%m}）"
+        return out
+    return _guard("cbc:money", load)
+
+
 def m2() -> pd.Series:
-    return _guard("cbc:m2", lambda: _series({t: _num(r[1]) for r in cbc_page(643, "M2")
-                                            if len(r) > 1 and (t := _month(r[0])) is not None}))
-
-
-M1B_PAGES = [642, 644, 645, 646, 639]
+    try:
+        return money()["M2"]
+    except Exception:  # noqa: BLE001  fall back to the 20-month table on the CBC front page
+        return _guard("cbc:m2", lambda: _series({t: _num(r[1]) for r in cbc_page(643, "M2")
+                                                if len(r) > 1 and (t := _month(r[0])) is not None}))
 
 
 def m1b() -> pd.Series:
-    def load():
-        errs = []
-        for pid in M1B_PAGES:
-            try:
-                rows = cbc_page(pid, "M1B")
-            except Exception as e:  # noqa: BLE001
-                errs.append(str(e)[:60])
-                continue
-            _diag["m1b"] = f"央行 lp-{pid}"
-            return _series({t: _num(r[1]) for r in rows if len(r) > 1 and (t := _month(r[0])) is not None})
-        raise RuntimeError("央行網站找不到 M1B 年增率頁面（" + "；".join(errs[:3]) + "）")
-    return _guard("cbc:m1b", load)
+    return money()["M1B"]
 
 
 # ------------------------------------------------------------------ public API
