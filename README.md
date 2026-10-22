@@ -387,6 +387,7 @@ git pull && ./install.sh terminal     # 多數版本只需重建 terminal；CHAN
 | 狀況 | 處理 |
 |---|---|
 | 所有服務沒起來，`ExecStartPre … .ft-root` 失敗 | 資料硬碟沒掛上，掛上後會自動啟動 |
+| 全部報價都是 no data，記錄有 `Could not resolve host` | 容器的 DNS 設定過期了（主機的 Tailscale／NetworkManager 改寫了 `/etc/resolv.conf`）。`./install.sh --no-build` 會把容器 DNS 固定下來（Tailscale 主機：MagicDNS＋1.1.1.1／8.8.8.8；自訂 `FT_DNS="…"`，取消 `FT_DNS=off`） |
 | 中文名稱查不到 | 證券清單沒下載成功：`journalctl --user -u fin-terminal \| grep securities` |
 | ETF 淨值 0 檔 | 證交所 MIS 暫時擋 IP 或非交易時段，稍後再試 |
 | 美國總經抓不到 | 看總經頁頂端的原因；可設 `FT_FRED_API_KEY` |

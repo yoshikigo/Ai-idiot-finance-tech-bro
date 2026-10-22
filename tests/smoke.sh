@@ -11,6 +11,9 @@ bad() { printf '\e[31m✗\e[0m %s\n' "$*"; fail=$((fail+1)); }
 j()   { python3 -c "import sys,json; d=json.load(sys.stdin); print($1)"; }
 
 curl -fsS -m 5 $B/healthz >/dev/null && ok "terminal up" || { bad "terminal down"; exit 1; }
+r=$(podman exec fin-terminal python -c "import socket; print(socket.gethostbyname('query1.finance.yahoo.com'))" 2>&1 | tail -n 1) \
+  && [[ $r =~ ^[0-9.]+$ ]] && ok "容器 DNS：query1.finance.yahoo.com → $r" \
+  || bad "容器查不到網址（$r）→ 報價會全部 no data；./install.sh --no-build 固定 DNS，或重啟 fin-terminal"
 curl -fsS $B/api/engines | j "'\n'.join(f\"{e['name']}: {'online' if e['online'] else 'OFFLINE'}\" for e in d)" | while read -r l; do echo "   $l"; done
 [[ $(curl -fsS $B/api/engines | j "sum(e['online'] for e in d)") == 8 ]] && ok "8/8 engines online" || bad "some engines offline"
 r=$(curl -fsS $B/api/ollama/models | j "d['ok'], len(d['models'])") && [[ $r == True* ]] && ok "Ollama reachable ($r)" || bad "Ollama unreachable"

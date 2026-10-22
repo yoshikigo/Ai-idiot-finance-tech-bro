@@ -2,6 +2,14 @@
 
 各版本新增功能的詳細說明（新的在上面）。使用方式請看 [README](README.md)。
 
+## 🔧 容器 DNS 固定（2026.10.22-39）
+
+- **全部報價 no data**：容器啟動時會複製一份主機的 `/etc/resolv.conf`。主機的 Tailscale（MagicDNS）或 NetworkManager 之後改寫這個檔，容器裡的那份就過期，Yahoo、證交所全部 `Could not resolve host`。
+- `install.sh` 現在會替每個單元寫 `~/.config/containers/systemd/<unit>.container.d/ft-dns.conf`：主機 DNS 由 Tailscale 管理時固定為 `100.100.100.100`（MagicDNS）→ `1.1.1.1` → `8.8.8.8`，每個 2 秒逾時；Tailscale 掛掉時還是查得到。其他主機不變（沿用快照）。`FT_DNS="…"` 自訂、`FT_DNS=off` 取消。
+- `tests/smoke.sh` 新增「容器 DNS」檢查；`uninstall.sh` 會一併移除 drop-in。
+
+升級：`./install.sh --no-build`（不用重 build，只寫 drop-in 並重啟）。
+
 ## 🕯 Kronos K 線預測（2026.10.22-38 新增）
 
 整合 [shiyu-coder/Kronos](https://github.com/shiyu-coder/Kronos)（MIT，AAAI 2026）：第一個開源的金融 K 線基礎模型，用 45+ 交易所的 K 線預訓練，把開高低收量轉成 token 後自回歸產生未來的 K 棒。和 TimesFM 只預測收盤價不同，Kronos 預測整根 K 棒。

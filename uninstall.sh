@@ -8,7 +8,7 @@ QDIR="$HOME/.config/containers/systemd"
 UNITS=(fin-terminal ft-fingpt ft-research ft-tradingagents ft-hedgefund ft-qlib ft-finrl ft-timesfm ft-laya ft-kronos gods-eye-view)
 for u in "${UNITS[@]}"; do
   systemctl --user stop "$u.service" 2>/dev/null || true
-  rm -f "$QDIR/$u.container"
+  rm -f "$QDIR/$u.container" "$QDIR/$u.container.d/ft-dns.conf"; rmdir "$QDIR/$u.container.d" 2>/dev/null || true
 done
 systemctl --user disable --now ft-obsidian-apply.path ft-obsidian-apply.timer 2>/dev/null || true
 rm -f "$HOME"/.config/systemd/user/ft-obsidian-apply.{service,path,timer} "$HOME/.local/share/fin-terminal/ft-obsidian-apply.sh"
