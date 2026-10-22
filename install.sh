@@ -238,9 +238,19 @@ else c_warn "找不到 $VAULT/.obsidian（vault 未掛載或路徑不對）。�
 systemctl --user daemon-reload
 systemctl --user enable --now ft-obsidian-apply.path ft-obsidian-apply.timer >/dev/null
 c_ok "ft-obsidian-apply.path / .timer 已啟用"
+ready=()
 for u in "${units[@]}"; do
+  # a localhost/ image that was never built makes podman try to pull it from https://localhost → exit 125
+  img=$(sed -n 's/^Image=//p' "$QDIR/$u.container" 2>/dev/null | head -1)
+  if [[ $img == localhost/* ]] && ! podman image exists "$img"; then
+    systemctl --user stop "$u.service" 2>/dev/null || true
+    c_warn "$u：還沒有映像 $img，先不啟動 → 建置：./install.sh $(for k in "${!UNITS[@]}"; do [[ " ${UNITS[$k]} " == *" $u "* ]] && echo "$k"; done | head -1)"
+    continue
+  fi
   systemctl --user restart "$u.service"
+  ready+=("$u")
 done
+units=("${ready[@]}")
 
 step "等待服務就緒"
 for u in "${units[@]}"; do

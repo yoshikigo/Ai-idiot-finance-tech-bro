@@ -2,6 +2,10 @@
 
 各版本新增功能的詳細說明（新的在上面）。使用方式請看 [README](README.md)。
 
+## 🔧 沒建過的引擎不啟動（2026.10.22-40）
+
+- `./install.sh --no-build` 會裝上所有引擎的單元；某個引擎的映像沒建過（例如還沒跑 `./install.sh kronos`）時，podman 會去 `https://localhost` 拉映像而失敗（exit 125），每 10 秒重試一次。現在 install.sh 會先檢查映像，沒有就不啟動，並提示要跑哪個指令建置。
+
 ## 🔧 容器 DNS 固定（2026.10.22-39）
 
 - **全部報價 no data**：容器啟動時會複製一份主機的 `/etc/resolv.conf`。主機的 Tailscale（MagicDNS）或 NetworkManager 之後改寫這個檔，容器裡的那份就過期，Yahoo、證交所全部 `Could not resolve host`。
