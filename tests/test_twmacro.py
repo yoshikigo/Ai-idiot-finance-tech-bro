@@ -178,3 +178,37 @@ def test_cpi_skips_zero_padded_tables(monkeypatch):
     market._cache.clear(); tm._neg.clear()
     c = tm.raw("CPI")
     assert c.index[-1] == pd.Timestamp(2026, 9, 1) and (c > -50).all()  # never the -100% of a zero-padded table
+
+
+def test_core_cpi_needs_all_codes(monkeypatch):
+    """'/1.M' only returns code 1 (總指數); the core series lives under another code → all-codes forms go first."""
+    from ft_common import market, twmacro as tm
+    core = json.loads(json.dumps(SDMX_CPI))
+    core["data"]["structure"]["dimensions"]["series"][0]["values"][1]["name"] = "不含新鮮蔬果及能源之總指數"
+    core["data"]["dataSets"][0]["series"]["1:0"] = {"observations": {str(k + 1): [100 + k * 0.1] for k in range(24)}}
+    only1 = json.loads(json.dumps(SDMX_CPI))
+    del only1["data"]["dataSets"][0]["series"]["0:1"]
+    seen = []
+
+    def fake(url, **kw):
+        seen.append(url)
+        if "/1." in url:
+            return json.dumps(only1).encode()
+        if "startTime" in url and "/.M" in url:
+            return json.dumps(core).encode()
+        return "參數錯誤(Parameter error)".encode()
+    monkeypatch.setattr(market, "FAKE", False)
+    monkeypatch.setattr(tm, "_get", fake)
+    market._cache.clear(); tm._neg.clear()
+    s = tm.core()
+    assert abs(s.iloc[-1] - (1.2 / 101.1 * 100)) < 0.01
+    assert not any("/1." in u for u in seen)
+
+
+def test_pick_error_lists_series_names(monkeypatch):
+    from ft_common import market, twmacro as tm
+    monkeypatch.setattr(market, "FAKE", False)
+    monkeypatch.setattr(tm, "_get", lambda url, **kw: json.dumps(SDMX_CPI).encode())
+    market._cache.clear(); tm._neg.clear()
+    with pytest.raises(RuntimeError, match="總指數"):
+        tm.core()

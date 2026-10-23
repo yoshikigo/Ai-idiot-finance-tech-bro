@@ -200,7 +200,9 @@ def _shapes(freq: str) -> list[str]:
     an empty dimension = all codes). The plain <table> query works for small tables only."""
     y = dt.date.today().year
     rng = f"&startTime=2000-{freq}1&endTime={y}-{freq}{12 if freq == 'M' else 4}"
-    return ["", *(f"/{f}.{freq}{rng}" for f in ("1", "1.", "1..", "", ".", "..", "..."))]
+    # all-codes forms first: "/1.M" keeps only code 1 of the first dimension (often just 總指數), which hides
+    # the other series of a table (e.g. 不含新鮮蔬果及能源 in A030103015)
+    return ["", *(f"/{f}.{freq}{rng}" for f in ("", ".", "..", "...", "1", "1.", "1.."))]
 
 
 def sdmx(funid: str, freq: str = "M") -> list[tuple[list[str], pd.Series]]:
@@ -248,7 +250,9 @@ def _pick(tables: list[str], want, label: str, freq: str = "M", positive: bool =
             if best is None or key > best[0]:
                 best = (key, f, n, s)
         if not hits:
-            errs.append(f"{f} 沒有符合的序列")
+            seen = list(dict.fromkeys("/".join(x for x in n if x) for n, _ in got))
+            errs.append(f"{f} 沒有符合的序列（{len(seen)} 個：{'、'.join(seen[:6])}{'…' if len(seen) > 6 else ''}）")
+            _diag[f"names:{f}"] = seen[:80]
     if best:
         _, f, n, s = best
         _diag[label] = f"{f}：{' / '.join(n)}（到 {s.index[-1]:%Y-%m}）"
@@ -277,7 +281,7 @@ def _monthly_yoy(lvl: pd.Series) -> pd.Series:
 
 CPI_TABLES = ["A030101015", "A030601015", "A030103015", "A030101025", "A030101019"]
 CORE_TABLES = ["A030103015", "A030101015", "A030101025", "A030101019"]
-CORE_RE = re.compile(r"不含.*(蔬|果).*能源|核心")
+CORE_RE = re.compile(r"不含.*(蔬|果).*(能源|能)|核心|蔬果及能源|蔬果.*能源")
 
 
 def cpi() -> pd.Series:
