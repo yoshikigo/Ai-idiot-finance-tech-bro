@@ -86,7 +86,7 @@ def test_sdmx_tries_filter_variants(monkeypatch):
     monkeypatch.setattr(market, "FAKE", False)
     monkeypatch.setattr(tm, "_get", fake)
     market._cache.clear(); tm._neg.clear()
-    assert tm.sdmx("A030101015") and len(seen) == 2 and "startTime" in seen[1]
+    assert tm.sdmx("A030101015") and "startTime" in seen[1] and "/1.M" in seen[1]
 
 
 def test_cbc_tables_and_unemp_fallback(monkeypatch):
@@ -180,29 +180,37 @@ def test_cpi_skips_zero_padded_tables(monkeypatch):
     assert c.index[-1] == pd.Timestamp(2026, 9, 1) and (c > -50).all()  # never the -100% of a zero-padded table
 
 
-def test_core_cpi_needs_all_codes(monkeypatch):
-    """'/1.M' only returns code 1 (總指數); the core series lives under another code → all-codes forms go first."""
+def _one(name, vals):
+    return {"data": {"structure": {"dimensions": {
+        "series": [{"id": "code", "values": [{"id": "1", "name": name}]}],
+        "observation": [{"id": "ym", "values": [{"id": f"{y}-M{m}"} for y in (2024, 2025) for m in range(1, 13)]}]}},
+        "dataSets": [{"series": {"0": {"observations": {str(k): [v] for k, v in enumerate(vals)}}}}]}}
+
+
+def test_core_cpi_walks_first_dimension_codes(monkeypatch):
+    """Real API: bare query of a big table → only 1 series; '/1.M' → code 1; codes 2, 3 … hold the rest."""
     from ft_common import market, twmacro as tm
-    core = json.loads(json.dumps(SDMX_CPI))
-    core["data"]["structure"]["dimensions"]["series"][0]["values"][1]["name"] = "不含新鮮蔬果及能源之總指數"
-    core["data"]["dataSets"][0]["series"]["1:0"] = {"observations": {str(k + 1): [100 + k * 0.1] for k in range(24)}}
-    only1 = json.loads(json.dumps(SDMX_CPI))
-    del only1["data"]["dataSets"][0]["series"]["0:1"]
+    tables = {"1": _one("總指數(不含食物)", [100 + k * 0.3 for k in range(24)]),
+              "2": _one("總指數(不含新鮮蔬果及能源)", [100 + k * 0.1 for k in range(24)])}
     seen = []
 
     def fake(url, **kw):
         seen.append(url)
-        if "/1." in url:
-            return json.dumps(only1).encode()
-        if "startTime" in url and "/.M" in url:
-            return json.dumps(core).encode()
+        if "A030103015" not in url:
+            return "參數錯誤(Parameter error)".encode()
+        tail = url.split("A030103015", 1)[1]
+        if tail == "":
+            return json.dumps(tables["1"]).encode()
+        code = tail[1:].split(".", 1)[0]
+        if tail.startswith(f"/{code}.M&") and code in tables:
+            return json.dumps(tables[code]).encode()
         return "參數錯誤(Parameter error)".encode()
     monkeypatch.setattr(market, "FAKE", False)
     monkeypatch.setattr(tm, "_get", fake)
     market._cache.clear(); tm._neg.clear()
     s = tm.core()
     assert abs(s.iloc[-1] - (1.2 / 101.1 * 100)) < 0.01
-    assert not any("/1." in u for u in seen)
+    assert "代碼 1–2" in tm._diag["sdmx:A030103015"]
 
 
 def test_pick_error_lists_series_names(monkeypatch):

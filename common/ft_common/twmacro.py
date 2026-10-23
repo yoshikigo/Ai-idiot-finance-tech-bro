@@ -195,35 +195,79 @@ def parse_sdmx(d: dict) -> list[tuple[list[str], pd.Series]]:
     return out
 
 
-def _shapes(freq: str) -> list[str]:
-    """Query forms per the DGBAS API doc: <table>/<dim1 codes>.<dim2>….<freq>&startTime=…&endTime=… (both times required;
-    an empty dimension = all codes). The plain <table> query works for small tables only."""
+def _range(freq: str) -> str:
     y = dt.date.today().year
-    rng = f"&startTime=2000-{freq}1&endTime={y}-{freq}{12 if freq == 'M' else 4}"
-    # all-codes forms first: "/1.M" keeps only code 1 of the first dimension (often just 總指數), which hides
-    # the other series of a table (e.g. 不含新鮮蔬果及能源 in A030103015)
+    return f"&startTime=2000-{freq}1&endTime={y}-{freq}{12 if freq == 'M' else 4}"
+
+
+def _shapes(freq: str) -> list[str]:
+    """Query forms per the DGBAS API doc: <table>/<dim1 codes>.<dim2>….<freq>&startTime=…&endTime=… (both times
+    required; an empty dimension = all codes). Kept for reference/tests; sdmx() walks them in its own order."""
+    rng = _range(freq)
     return ["", *(f"/{f}.{freq}{rng}" for f in ("", ".", "..", "...", "1", "1.", "1.."))]
 
 
+def _sdmx_try(funid: str, v: str, timeout: float = 90):
+    """→ (series list, None) or ([], reason)."""
+    try:
+        body = _get(SDMX.format(funid + v), timeout=timeout)
+    except Exception as e:  # noqa: BLE001
+        return [], type(e).__name__
+    if body.lstrip()[:1] != b"{":
+        return [], body[:24].decode("utf-8", "replace").strip()
+    try:
+        got = parse_sdmx(json.loads(body))
+    except ValueError as e:
+        return [], type(e).__name__
+    return got, (None if got else "0 序列")
+
+
 def sdmx(funid: str, freq: str = "M") -> list[tuple[list[str], pd.Series]]:
-    """Fetch one table: plain query first, then the filtered forms (bigger tables answer 參數錯誤 when bare)."""
+    """Fetch every series of one table.
+
+    Seen on the real API: the bare query answers small tables in full (A030101019: 81 series) but big ones with only
+    the first code of each dimension (A030103015 → just 總指數(不含食物)) or 參數錯誤; an all-empty filter isn't
+    accepted either. So: bare query if it brings several series, otherwise find the dimension count with
+    code 1 ("/1.M", "/1..M", …) and walk the first dimension's codes 2, 3, … until they run out."""
     def load():
         why = []
-        for v in _shapes(freq):
-            try:
-                body = _get(SDMX.format(funid + v), timeout=90)
-            except Exception as e:  # noqa: BLE001
-                why.append(f"{v.split('&')[0] or '基本'}: {type(e).__name__}")
+        rng = _range(freq)
+        got, err = _sdmx_try(funid, "")
+        if len(got) > 1:
+            _diag[f"sdmx:{funid}"] = f"OK（基本查詢，{len(got)} 個序列）"
+            return got
+        why.append(f"基本: {err or f'{len(got)} 序列'}")
+        bare = got
+        for dots in ("", ".", "..", "...", "...."):
+            first, err = _sdmx_try(funid, f"/1{dots}.{freq}{rng}")
+            if not first:
+                why.append(f"/1{dots}.{freq}: {err}")
                 continue
-            if body.lstrip()[:1] != b"{":
-                why.append(f"{v.split('&')[0] or '基本'}: {body[:24].decode('utf-8', 'replace').strip()}")
-                continue
-            got = parse_sdmx(json.loads(body))
+            out = {tuple(n): (n, s) for n, s in first}
+            miss, last = 0, 1
+            for k in range(2, 61):
+                more, _ = _sdmx_try(funid, f"/{k}{dots}.{freq}{rng}", timeout=40)
+                if more:
+                    miss, last = 0, k
+                    for n, s in more:
+                        out.setdefault(tuple(n), (n, s))
+                else:
+                    miss += 1
+                    if miss >= 3:
+                        break
+            got = list(out.values())
+            _diag[f"sdmx:{funid}"] = f"OK（/k{dots}.{freq}，代碼 1–{last}，{len(got)} 個序列）"
+            return got
+        for v in (f"/.{freq}{rng}", f"/..{freq}{rng}", f"/...{freq}{rng}"):
+            got, err = _sdmx_try(funid, v)
             if got:
-                _diag[f"sdmx:{funid}"] = f"OK（{v.split('&')[0] or '基本查詢'}，{len(got)} 個序列）"
+                _diag[f"sdmx:{funid}"] = f"OK（{v.split('&')[0]}，{len(got)} 個序列）"
                 return got
-            why.append(f"{v.split('&')[0] or '基本'}: 0 序列")
-        raise RuntimeError(f"主計總處 {funid}：" + "；".join(why[:4]))
+            why.append(f"{v.split('&')[0]}: {err}")
+        if bare:
+            _diag[f"sdmx:{funid}"] = "OK（基本查詢，只有 1 個序列）"
+            return bare
+        raise RuntimeError(f"主計總處 {funid}：" + "；".join(why[:5]))
     return _guard(f"sdmx:{funid}:{freq}", load)
 
 
