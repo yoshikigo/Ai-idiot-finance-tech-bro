@@ -326,7 +326,7 @@ cd fin-terminal
 | `FT_FRED_API_KEY` | 選用；fredgraph.csv 抓不到時改走 FRED 官方 API |
 | `FT_SIGNUP` | `open`（預設，可自行註冊）／`off`（只能由管理者建帳號） |
 | `FT_EVENTS_YEARS`、`FT_EVENTS_AI` | 重大事件背景偵測年數、是否讓 AI 命名 |
-| `FT_TA_MAX_TOKENS_*`、`FT_TA_TIMEOUT` | TradingAgents 各節點輸出上限與逾時（本機模型容易寫不停） |
+| `FT_TA_MAX_TOKENS_*`、`FT_TA_TIMEOUT`、`FT_TA_RESUME_HOURS` | TradingAgents 各節點輸出上限與逾時（本機模型容易寫不停）；失敗後沿用已完成分析師報告的有效時間（預設 12 小時） |
 | `FT_RESEARCH_START`、`FT_RESEARCH_DAILY_YEARS` | 策略研究資料回補範圍 |
 | `FT_PUBLIC_HOSTS`、`FT_PUBLIC_TOTP`、`FT_PUBLIC_SIGNUP` | 公開網址設定（`--cloudflare` 會自動寫入） |
 
@@ -395,6 +395,7 @@ git pull && ./install.sh terminal     # 多數版本只需重建 terminal；CHAN
 | 策略研究說「還沒有資料」 | 背景還在回補，看「資料庫」頁的進度與錯誤 |
 | Laya／TimesFM 一直在下載 | 第一次要從 Hugging Face 下載權重：`journalctl --user -u ft-laya -n 50` |
 | TradingAgents 卡很久 | 本機模型寫不停：調低 `FT_TA_MAX_TOKENS_*`；側欄流程儀表板會顯示卡在哪個代理人 |
+| TradingAgents `OpenAITimeoutError` | 單次呼叫超過 `FT_TA_TIMEOUT`（預設 600 秒），多半是 Ollama 在排隊或模型有一部分跑在 CPU（`ollama ps`）。可調成 `FT_TA_TIMEOUT=1200`；按「用相同參數」重跑時，上次已完成的分析師報告會沿用（↺），只重跑失敗的 |
 | 世界頁「God's Eye View 未連線」 | `systemctl --user status gods-eye-view`；第一次啟動約需 1 分鐘編譯 |
 | Obsidian 沒出現筆記 | `ls ~/fin-terminal-data/data/obsidian-outbox`，再看 `journalctl --user -u ft-obsidian-apply`（多半是 vault 路徑或沒掛上） |
 

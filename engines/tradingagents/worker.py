@@ -7,6 +7,7 @@ from ft_common import ollama
 from ft_common.engine import Ctx, Engine, serve, split_tickers, today
 
 import limits
+import resume
 import world_hook
 
 ANALYSTS = [
@@ -30,6 +31,7 @@ SCHEMA = [
      "default": limits.DEFAULT_CAPS["debate"], "min": 512, "max": 16384},
     {"name": "max_tokens_report", "label": "分析師報告每次輸出上限（tokens）", "type": "int",
      "default": limits.DEFAULT_CAPS["report"], "min": 1024, "max": 32768},
+    {"name": "resume", "label": "沿用上次失敗時已完成的分析師報告（同標的、同日期、12 小時內；只重跑沒完成的）", "type": "bool", "default": True},
     {"name": "ft_context", "label": "加入 FT 市場背景（台股中文新聞、籌碼、月營收、產業強弱、台灣／美國總經、重大事件與日程）", "type": "bool", "default": True},
 ]
 
@@ -86,6 +88,14 @@ def run(ctx: Ctx) -> dict:
     pp = os.environ.get("FT_TA_PRESENCE_PENALTY", "")
     limits.install(caps, ctx.log, stats, timeout=float(os.environ.get("FT_TA_TIMEOUT", "600")),
                    presence_penalty=float(pp) if pp else None, pipe=pipe)
+    store = resume.Store(ctx.dir, ticker, date, cfg["output_language"],
+                         hours=float(os.environ.get("FT_TA_RESUME_HOURS", "12")))
+    use_resume = p.get("resume", True) not in (False, "false", "0", 0)
+    reuse = {k: v for k, v in store.load().items() if k in analysts} if use_resume else {}
+    resume.install(store, reuse, ctx.log, pipe, job_id=str(getattr(ctx.job, "id", "")))
+    if reuse:
+        names = [lab for _, (k, _, lab) in resume.ANALYSTS.items() if k in reuse]
+        ctx.log(f"↺ 沿用上次失敗前已完成的報告：{'、'.join(names)}；只重跑其餘分析師")
     ctx.log("輸出上限：" + "、".join(f"{k} {v}" for k, v in caps.items())
             + f"；逾時 {os.environ.get('FT_TA_TIMEOUT', '600')} 秒、重試 {cfg['llm_max_retries']} 次")
     if deep.get("model") != quick.get("model"):
@@ -131,6 +141,7 @@ def run(ctx: Ctx) -> dict:
         pipe.finish(False)
         raise
     pipe.finish(True)
+    store.clear()  # finished: the next run is a new analysis, not a replay
 
     ctx.step(95, "整理報告")
     md = [f"# {ticker} · {date} · 評等：**{rating}**\n"]
@@ -149,6 +160,9 @@ def run(ctx: Ctx) -> dict:
     if risk.get("history"):
         md.append(f"## ⚖️ 風控討論\n\n{risk['history']}\n")
 
+    if reuse:
+        md.insert(1, "> ↺ 沿用上次（失敗前）已完成的報告：" + "、".join(
+            lab for _, (k, _, lab) in resume.ANALYSTS.items() if k in reuse) + "。\n")
     if stats:
         cut = [k for k, v in stats.items() if v["cut"]]
         if cut:

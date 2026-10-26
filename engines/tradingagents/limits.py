@@ -126,6 +126,14 @@ class Pipeline:
             n["status"], n["ended"] = ("cut" if cut else "done"), now
         self._touch()
 
+    def reused(self, label, note: str):
+        """An analyst that answered with the report saved by an earlier, failed run."""
+        _, n = self._node(label)
+        if n:
+            now = time.time()
+            n.update(status="done", note=note, reused=True, started=now, ended=now, inflight=0)
+            self._touch()
+
     def error(self, label, err: str):
         _, n = self._node(label)
         if n:

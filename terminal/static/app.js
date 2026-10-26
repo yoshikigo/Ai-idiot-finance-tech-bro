@@ -1905,20 +1905,20 @@ function renderPipe(box, pipe, status) {
     const nodesBox = h("div", { class: "pipe-nodes" });
     const col = h("div", { class: `pipe-stage ${sst}` }, h("div", { class: "pipe-title" }, h("span", { class: "pipe-no" }, k + 1), st.stage), nodesBox);
     for (const n of ns) {
-      const icon = { pending: "○", running: "◉", done: "✓", cut: "✂", error: "✗" }[n.status] || "○";
+      const icon = n.reused ? "↺" : { pending: "○", running: "◉", done: "✓", cut: "✂", error: "✗" }[n.status] || "○";
       const sub = h("div", { class: "pipe-sub" });
       if (n.status === "running") {
         const gen = n.inflight > 0;
         sub.append(h("span", { class: "pipe-what " + (gen ? "gen" : "tool") }, gen ? "LLM 生成中" : "工具／資料抓取中"),
           h("span", { class: "pipe-live", "data-since": gen ? n.call_started : (n.waiting_since || n.started) }, ""),
           h("span", { class: "pipe-tot", "data-since": n.started, "data-prefix": "共 " }, ""));
-      } else if (n.started) {
+      } else if (n.started && !n.reused) {
         const dur = (n.ended || Date.now() / 1000) - n.started;
         sub.append(h("span", {}, fmtDur(dur)));
       }
       if (n.calls) sub.append(h("span", { class: "muted" }, `${n.calls} 次・${fmtTok(n.out)} tok`));
       if (n.cut) sub.append(h("span", { class: "pipe-cutnote", title: "達到輸出上限被截斷（內容保留）" }, "達上限"));
-      if (n.note) sub.append(h("span", { class: "down" }, n.note));
+      if (n.note) sub.append(h("span", { class: n.reused ? "muted" : "down", title: n.reused ? "上次失敗前已完成，這次沒有再呼叫模型" : "" }, n.note));
       nodesBox.append(h("div", { class: `pipe-node ${n.status}`, title: n.label }, h("span", { class: "pipe-icon" }, icon), h("span", { class: "pipe-label" }, n.label), sub));
     }
     row.append(col);
