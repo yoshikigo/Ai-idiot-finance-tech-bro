@@ -57,10 +57,10 @@ const md = (s) => DOMPurify.sanitize(marked.parse(String(s || ""), { breaks: fal
 
 /* ------------------------------------------------------------ symbols / commands */
 const EXCH = { TT: ".TW", TW: ".TW", TWO: ".TWO", US: "", JP: ".T", JT: ".T", HK: ".HK", LN: ".L", GR: ".DE", GY: ".DE", FP: ".PA", KS: ".KS", CN: ".TO", AU: ".AX" };
-const PANE_FNS = ["GP", "GIP", "DES", "N", "FA", "ETF", "LAYA", "KIT"];
+const PANE_FNS = ["OV", "GP", "GIP", "DES", "N", "FA", "ETF", "LAYA", "KIT"];
 const STOCK_FNS = ["GP", "GIP", "DES", "N", "FA", "LAYA", "KIT"];
 const ETF_FNS = ["GP", "GIP", "ETF", "N", "LAYA", "KIT"];
-const FN_LABEL = { GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: "財報", ETF: "ETF 資料", LAYA: "⚖ 判斷", KIT: "🧰 工具箱" };
+const FN_LABEL = { OV: "總覽", GP: "走勢", GIP: "盤中", DES: "概況", N: "新聞", FA: "財報", ETF: "ETF 資料", LAYA: "⚖ 判斷", KIT: "🧰 工具箱" };
 const KIT_TABS = [["tech", "技術面"], ["options", "選擇權"], ["research", "評等籌碼"], ["earnings", "財報季"], ["value", "價值檢查"], ["intel", "市場情報"]];
 const KIT_WORD = { "技術": "tech", "技術面": "tech", "技術分析": "tech", "選擇權": "options", "期權": "options", "評等": "research", "籌碼": "research", "目標價": "research", "法人": "research", "財報季": "earnings", "EPS": "earnings", "法說": "earnings", "價值": "value", "價值投資": "value", "情報": "intel", "類股輪動": "intel", "市場情報": "intel", "工具箱": "tech" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
@@ -107,7 +107,11 @@ const S = {
   ask: [],
   charts: new Map(),
   lastPx: {},
+  clean: true,    // 簡潔版面（左導覽＋單一頁面＋右側 AI）；false = 經典四格終端機
+  hist: [],       // 簡潔版面：上一頁
 };
+try { S.clean = localStorage.getItem("ft.layout") !== "classic"; } catch (e) {}
+const DEF_FN = () => (S.clean ? "OV" : "GP");
 
 /* ------------------------------------------------------------ boot */
 async function boot() {
@@ -121,13 +125,21 @@ async function boot() {
   try { const saved = JSON.parse(localStorage.getItem("ft.panes") || "null"); if (saved && saved.length === 4) lp = saved; } catch (e) {}
   S.panes = [0, 1, 2, 3].map((i) => ({ sec: (lp[i] || {}).sec || "", fn: (lp[i] || {}).fn || "W", q: (lp[i] || {}).q || "", range: "1y",
     net: (lp[i] || {}).net || "", node: (lp[i] || {}).node || "", hl: (lp[i] || {}).hl || "", cmp: !!(lp[i] || {}).cmp }));
+  if (S.clean) {  // 簡潔版面只有一頁，狀態另存，不動經典版面的四格
+    let c0 = null;
+    try { c0 = JSON.parse(localStorage.getItem("ft.pane0c") || "null"); } catch (e) {}
+    S.panes[0] = { range: "1y", ...(c0 || { fn: "FOCUS", sec: "" }) };
+    try { S.ask = JSON.parse(localStorage.getItem("ft.ask") || "[]").filter((m) => m && m.role); } catch (e) { S.ask = []; }
+    document.body.classList.add("clean");
+  }
   applyColors();
   await Promise.all([loadUser(), loadSC()]);
-  try { S.sideTab = localStorage.getItem("ft.sideTab") || S.sideTab; } catch (e) {}
+  try { S.sideTab = localStorage.getItem(S.clean ? "ft.sideTabC" : "ft.sideTab") || (S.clean ? "ask" : S.sideTab); } catch (e) {}
   try { const w = localStorage.getItem("ft.sideW"); if (w) document.documentElement.style.setProperty("--side-w", w); } catch (e) {}
   try { if (localStorage.getItem("ft.sideClosed") === "1") $("#main").classList.add("side-closed"); } catch (e) {}
   if (window.matchMedia("(max-width: 820px)").matches) $("#main").classList.add("side-closed");
   buildFkeys();
+  if (S.clean) buildNav();
   buildPanes();
   setupCmd();
   setupResizer();
@@ -136,6 +148,7 @@ async function boot() {
   setInterval(refreshLive, 15000);
   await loadEngines();
   renderSide();
+  if (S.clean) renderNavEngines();
   setInterval(pollJobs, 5000);
   setFocus(0);
   document.addEventListener("keydown", hotkeys);
@@ -144,6 +157,11 @@ async function boot() {
 }
 
 function savePanes() {
+  if (S.clean) {
+    const p = S.panes[0];
+    try { localStorage.setItem("ft.pane0c", JSON.stringify({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, secMkt: p.secMkt, twmId: p.twmId, fredId: p.fredId, fxSel: p.fxSel, kit: p.kit })); } catch (e) {}
+    return;
+  }
   try { localStorage.setItem("ft.panes", JSON.stringify(S.panes.map((p) => ({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, cmp: p.cmp, fxSel: p.fxSel })))); } catch (e) {}
 }
 
@@ -183,7 +201,7 @@ function setupCmd() {
     if (it.name) NAMES[sym] = it.name;
     const fn = S.panes[S.focus].fn;
     if (isFund(sym)) setPane(S.focus, { sec: sym, fn: "FUNDD" });
-    else run(`${sym} ${STOCK_FNS.includes(fn) ? fn : "GP"}`);
+    else run(`${sym} ${STOCK_FNS.includes(fn) || fn === "OV" ? fn : DEF_FN()}`);
     inp.value = ""; hideSug();
   };
   inp.addEventListener("input", () => {
@@ -291,7 +309,7 @@ async function run(raw) {
     return setPane(target, { sec, fn: fixFn(sec, head) });
   }
   // <security> [exchange] [function]   — security can be a Chinese name, a code, a Yahoo symbol or FUND:<id>
-  let fn = "GP";
+  let fn = DEF_FN();
   const last = alias(t[t.length - 1]);
   if (PANE_FNS.includes(last) && t.length > 1) { fn = last; t = t.slice(0, -1); }
   if (isFund(t[0].toUpperCase())) return setPane(target, { sec: t[0].replace(/^fund:/i, "FUND:"), fn: "FUNDD" });
@@ -318,11 +336,15 @@ function buildPanes() {
   const root = $("#panes");
   root.innerHTML = "";
   S.panes.forEach((p, i) => {
+    if (S.clean && i > 0) return;
     const el = h("div", { class: "pane", "data-i": i, onmousedown: () => setFocus(i) },
       h("div", { class: "pane-head" },
+        S.clean ? h("button", { class: "pane-menu", title: "選單", onclick: () => document.body.classList.toggle("nav-open") }, "☰") : null,
+        S.clean ? h("button", { class: "pane-back", title: "上一頁", onclick: () => goBack() }, "‹") : null,
         h("span", { class: "pane-no" }, i + 1),
         h("span", { class: "pane-sec" }),
         h("span", { class: "pane-name" }),
+        S.clean ? h("button", { class: "pane-ai", title: "AI 助理（Ctrl+B）", onclick: () => toggleSide() }, "AI") : null,
         h("span", { class: "pane-fns" })),
       h("div", { class: "pane-body" }));
     root.append(el);
@@ -331,6 +353,7 @@ function buildPanes() {
 }
 
 function setFocus(i) {
+  if (S.clean) i = 0;
   S.focus = i;
   $$(".pane").forEach((el, j) => el.classList.toggle("focus", j === i));
   $("#paneTarget").textContent = i + 1;
@@ -339,6 +362,16 @@ function setFocus(i) {
 }
 
 function setPane(i, patch) {
+  if (S.clean) {  // one page: everything opens here; remember where we were for ‹
+    i = 0;
+    const cur = S.panes[0];
+    if ((patch.fn && patch.fn !== cur.fn) || (patch.sec && patch.sec !== cur.sec)) {
+      S.hist.push({ ...cur });
+      if (S.hist.length > 40) S.hist.shift();
+    }
+    document.body.classList.remove("nav-open");
+    $("#suggest").classList.add("hidden");
+  }
   Object.assign(S.panes[i], patch);
   savePanes();
   setFocus(i);
@@ -358,15 +391,21 @@ function renderPane(i) {
   $(".pane-name", el).textContent = usesSec ? fnLabel(p.fn) : "";
   const fns = $(".pane-fns", el); fns.innerHTML = "";
   if (usesSec) {
-    for (const f of (isETF(p.sec) ? ETF_FNS : STOCK_FNS))
-      fns.append(h("button", { class: f === p.fn ? "on" : "", title: f, onclick: (e) => { e.stopPropagation(); setPane(i, { fn: f }); } }, FN_LABEL[f]));
+    const list = isETF(p.sec) ? ETF_FNS : STOCK_FNS;
+    for (const f of (S.clean ? ["OV", ...list] : list))
+      fns.append(h("button", { class: f === p.fn ? "on" : "", title: f, onclick: (e) => { e.stopPropagation(); setPane(i, { fn: f }); } }, plain(FN_LABEL[f])));
     const chains = (S.scIndex || {})[p.sec];
     if (chains && chains.length)
-      fns.append(h("button", { title: "所屬供應鏈：" + chains.map((c) => c.name).join("、"), onclick: (e) => { e.stopPropagation(); setPane(i, { fn: "SC", net: "ai-datacenter", node: chains[0].id, hl: p.sec }); } }, "⛓ 供應鏈"));
-    fns.append(h("button", { title: "TradingAgents 多代理人分析", onclick: (e) => { e.stopPropagation(); openSide("tradingagents"); prefillEngine("tradingagents", p.sec); } }, "AI▸"));
+      fns.append(h("button", { title: "所屬供應鏈：" + chains.map((c) => c.name).join("、"), onclick: (e) => { e.stopPropagation(); setPane(i, { fn: "SC", net: "ai-datacenter", node: chains[0].id, hl: p.sec }); } }, plain("⛓ 供應鏈")));
+    if (!S.clean) fns.append(h("button", { title: "TradingAgents 多代理人分析", onclick: (e) => { e.stopPropagation(); openSide("tradingagents"); prefillEngine("tradingagents", p.sec); } }, "AI▸"));
   }
-  fns.append(h("button", { title: "最大化", onclick: (e) => { e.stopPropagation(); toggleMax(i); } }, "⤢"));
-  const R = { SECTOR: renderSector, KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
+  if (!S.clean) fns.append(h("button", { title: "最大化", onclick: (e) => { e.stopPropagation(); toggleMax(i); } }, "⤢"));
+  if (S.clean) {
+    el.classList.toggle("has-back", S.hist.length > 0); el.classList.toggle("has-tabs", usesSec); navActive();
+    const ai = $("#askIn");  // the AI panel follows the page (unless you are typing)
+    if (S.sideTab === "ask" && ai && !ai.value && S.askSec !== (usesSec ? p.sec : "")) renderSide();
+  }
+  const R = { OV: renderOV, SECTOR: renderSector, KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
               ETFM: renderETFMon, FUNDS: renderFundSearch, FUNDD: renderFund, WORLD: renderWorld, LAYA: renderLaya, LAB: renderLab, DATA: renderData };
   if (R[p.fn]) R[p.fn](i, body, p);
   else if (MON_FNS.includes(p.fn)) renderMon(i, body, p);
@@ -374,7 +413,7 @@ function renderPane(i) {
   if (usesSec) loadName(i, p.sec);
 }
 
-function fnLabel(f) { return { GP: "價格走勢", GIP: "盤中走勢", DES: "公司概況", N: "新聞", FA: "財務報表", ETF: "ETF 資料", LAYA: "Laya 交易判斷", KIT: "分析工具箱" }[f] || f; }
+function fnLabel(f) { return { OV: "總覽", GP: "價格走勢", GIP: "盤中走勢", DES: "公司概況", N: "新聞", FA: "財務報表", ETF: "ETF 資料", LAYA: "Laya 交易判斷", KIT: "分析工具箱" }[f] || f; }
 
 async function loadName(i, sec) {
   try {
@@ -382,7 +421,9 @@ async function loadName(i, sec) {
     const el = paneEl(i); if (!el || S.panes[i].sec !== sec || !PANE_FNS.includes(S.panes[i].fn)) return;
     if (q && q.name) { NAMES[sec] = q.name; $(".pane-sec", el).textContent = showName(sec); }
     if (q && q.kind) KIND[sec] = q.kind;
-    if (q && q.last != null) $(".pane-name", el).innerHTML = `${fnLabel(S.panes[i].fn)} · <span class="${cls(q.pct)}">${nf(q.last, pxd(q.last))} ${pct(q.pct)}</span>`;
+    if (q && q.last != null) $(".pane-name", el).innerHTML = S.clean
+      ? `<span class="pn-px">${nf(q.last, pxd(q.last))}</span> <span class="${cls(q.pct)}">${q.chg > 0 ? "+" : ""}${nf(q.chg, pxd(q.last))}（${pct(q.pct)}）</span>`
+      : `${fnLabel(S.panes[i].fn)} · <span class="${cls(q.pct)}">${nf(q.last, pxd(q.last))} ${pct(q.pct)}</span>`;
   } catch (e) {}
 }
 
@@ -824,16 +865,16 @@ async function renderGP(i, body, p) {
   const fcBar = h("span", { class: "fc-bar" });
   if (!intraday) {
     fcBar.append(h("button", { class: p.fc ? "on fc-btn" : "fc-btn", title: "TimesFM 時間序列基礎模型預測（只看過去價格）",
-      onclick: () => { S.panes[i].fc = p.fc ? 0 : (p.fcH || 30); renderPane(i); } }, "🔮 預測"));
+      onclick: () => { S.panes[i].fc = p.fc ? 0 : (p.fcH || 30); renderPane(i); } }, plain("🔮 預測")));
     if (p.fc) [10, 30, 60, 120].forEach((d) => fcBar.append(h("button", { class: p.fc === d ? "on" : "", onclick: () => { S.panes[i].fc = S.panes[i].fcH = d; renderPane(i); } }, d + "日")));
     fcBar.append(h("button", { class: p.kr ? "on kr-btn" : "kr-btn", title: "Kronos K 線基礎模型：抽樣多條未來的開高低收路徑，畫出中位 K 棒與 80% 區間（只看過去 K 線）",
-      onclick: () => { S.panes[i].kr = p.kr ? 0 : (p.krH || 20); renderPane(i); } }, "🕯 Kronos"));
+      onclick: () => { S.panes[i].kr = p.kr ? 0 : (p.krH || 20); renderPane(i); } }, plain("🕯 Kronos")));
     if (p.kr) [10, 20, 60].forEach((d) => fcBar.append(h("button", { class: p.kr === d ? "on" : "", onclick: () => { S.panes[i].kr = S.panes[i].krH = d; renderPane(i); } }, d + "日")));
     ranges.append(fcBar);
     ranges.append(h("button", { class: majorOn(p) ? "on mev-btn" : "mev-btn", title: "市場重大事件：指數大漲大跌、Fed 利率決策、你自己加的事件（滑到標記看說明，點標記開「大事」頁）",
-      onclick: () => { S.panes[i].mev = !majorOn(p); renderPane(i); } }, "📌 大事"));
+      onclick: () => { S.panes[i].mev = !majorOn(p); renderPane(i); } }, plain("📌 大事")));
     ranges.append(h("button", { class: p.ev ? "on ev-btn" : "ev-btn", title: "God's Eye View 偵測到的現實世界事件（與這檔相關的區域）",
-      onclick: () => { S.panes[i].ev = !p.ev; renderPane(i); } }, "🌐 事件"));
+      onclick: () => { S.panes[i].ev = !p.ev; renderPane(i); } }, plain("🌐 事件")));
   }
   const box = h("div", { class: "chart-box" });
   body.append(head, ranges, box);
@@ -858,6 +899,13 @@ async function renderGP(i, body, p) {
 }
 
 function chartTheme() {
+  if (S.clean) return {
+    layout: { background: { color: "transparent" }, textColor: "#8d999f", fontFamily: getComputedStyle(document.body).fontFamily, fontSize: 11 },
+    grid: { vertLines: { visible: false }, horzLines: { color: "#1a2328" } },
+    rightPriceScale: { borderVisible: false }, timeScale: { borderVisible: false, timeVisible: true, secondsVisible: false },
+    crosshair: { mode: 0, vertLine: { color: "#5f6b72", labelBackgroundColor: "#2e3a40" }, horzLine: { color: "#5f6b72", labelBackgroundColor: "#2e3a40" } },
+    localization: { locale: "zh-TW" },
+  };
   return {
     layout: { background: { color: "#07090b" }, textColor: "#8a939c", fontFamily: getComputedStyle(document.body).fontFamily, fontSize: 11 },
     grid: { vertLines: { color: "#11161b" }, horzLines: { color: "#11161b" } },
@@ -876,7 +924,7 @@ function drawCandles(i, box, rows, withMA) {
   chart.priceScale("vol").applyOptions({ scaleMargins: { top: 0.82, bottom: 0 } });
   v.setData(rows.map((r) => ({ time: r.time, value: r.volume, color: (r.close >= r.open ? UP : DN) + "59" })));
   if (withMA) {
-    for (const [n, col] of [[20, "#ffa028"], [60, "#4ba3ff"]]) {
+    for (const [n, col] of S.clean ? [[20, "#ff9960"], [60, "#5b7a9e"]] : [[20, "#ffa028"], [60, "#4ba3ff"]]) {
       if (rows.length < n) continue;
       const s = chart.addLineSeries({ color: col, lineWidth: 1, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false });
       const pts = []; let sum = 0;
@@ -1237,7 +1285,8 @@ function quoteTable(rows, onRemove) {
 function quickOpen(sym, fn) {
   // single click in a list: open in the *next* pane so the list stays visible
   if (isFund(sym)) fn = "FUNDD";
-  fn = fn || "GP";
+  fn = fn || DEF_FN();
+  if (S.clean) return setPane(0, { sec: sym, fn });
   const target = S.panes.findIndex((p, j) => j !== S.focus && (p.fn === fn || (fn !== "FUNDD" && p.fn === "GP")));
   const j = target >= 0 ? target : (S.focus + 1) % 4;
   setPane(j, { sec: sym, fn });
@@ -1248,7 +1297,7 @@ async function renderMon(i, body, p) {
   try {
     const d = await api(`/api/monitor/${p.fn}`);
     if (S.panes[i].fn !== p.fn) return;
-    $(".pane-name", paneEl(i)).textContent = "單擊在下一格看圖、雙擊在本格";
+    $(".pane-name", paneEl(i)).textContent = S.clean ? "" : "單擊在下一格看圖、雙擊在本格";
     body.innerHTML = "";
     if (p.fn === "MAG7" || p.fn === "TW") body.append(h("div", { class: "ranges" }, h("span", { class: "grow" }),
       h("button", { onclick: () => setPane(i, { fn: "SECTOR", secMkt: p.fn === "TW" ? "tw" : "us", secSel: "" }) }, `🥧 ${p.fn === "TW" ? "台股" : "美股"}產業分布 ▸`)));
@@ -1280,7 +1329,7 @@ async function renderW(i, body) {
       S.settings = await api("/api/settings", { method: "PUT", json: { watchlist: wl.filter((x) => x !== sym) } });
       renderPane(i); tape();
     }));
-    $(".pane-name", paneEl(i)).textContent = "單擊看圖";
+    $(".pane-name", paneEl(i)).textContent = S.clean ? "" : "單擊看圖";
   } catch (e) { holder.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; }
 }
 
@@ -1607,6 +1656,7 @@ async function tape() {
   if (!wl.length) return;
   try {
     const rows = await api(`/api/quotes?s=${encodeURIComponent(wl.join(","))}`);
+    if (S.clean) renderNavWatch(rows);
     const track = h("div", { class: "tape-track" });
     for (const r of rows) {
       if (r.last == null) continue;
@@ -1628,15 +1678,17 @@ function toggleSide(force) {
   const closed = force === undefined ? !m.classList.contains("side-closed") : !force;
   m.classList.toggle("side-closed", closed);
   $("#toggleSide").textContent = closed ? "AI ◂" : "AI ▸";
+  document.body.classList.toggle("side-shut", closed);
   try { localStorage.setItem("ft.sideClosed", closed ? "1" : "0"); } catch (e) {}
   setTimeout(() => S.charts.forEach((c) => c.fit && c.fit()), 50);
 }
 $("#toggleSide").addEventListener("click", () => toggleSide());
 $("#userBtn").addEventListener("click", () => setPane(S.focus, { fn: "HOLD" }));
+$("#layoutBtn").addEventListener("click", () => setLayout("clean"));
 
 function openSide(tab) {
   toggleSide(true);
-  if (tab && tab !== S.sideTab) { S.sideTab = tab; try { localStorage.setItem("ft.sideTab", tab); } catch (e) {} renderSide(); }
+  if (tab && tab !== S.sideTab) { S.sideTab = tab; try { localStorage.setItem(S.clean ? "ft.sideTabC" : "ft.sideTab", tab); } catch (e) {} renderSide(); }
 }
 
 function setupResizer() {
@@ -1662,11 +1714,13 @@ function updateStatus() {
   const s = S.settings || {};
   const on = S.engines.filter((e) => e.online).length;
   $("#status").innerHTML = `Ollama <b>${esc(s.model || "?")}</b> · 引擎 ${on}/${S.engines.length}`;
+  const ns = $("#navStatus"); if (ns) ns.innerHTML = `<span class="dot ${on ? "on" : "off"}"></span>${esc(s.model || "?")} · 引擎 ${on}/${S.engines.length}`;
 }
 
 function renderTabs() {
   const tabs = $("#sideTabs"); tabs.innerHTML = "";
   const busy = (n) => (S.jobs[n] || []).some((j) => j.status === "running" || j.status === "queued");
+  if (S.clean) return renderSideHead(tabs, busy);
   for (const e of S.engines) {
     tabs.append(h("button", { class: S.sideTab === e.name ? "on" : "", onclick: () => openSide(e.name) },
       h("span", { class: "dot " + (busy(e.name) ? "busy" : e.online ? "on" : "off") }), SHORT[e.name] || e.name));
@@ -1679,6 +1733,7 @@ function renderTabs() {
 
 function renderSide() {
   renderTabs();
+  if (S.clean) renderNavEngines();
   const body = $("#sideBody");
   if (S.es) { S.es.close(); S.es = null; }
   body.innerHTML = "";
@@ -1757,6 +1812,7 @@ function renderEngine(body, eng) {
     try {
       const j = await api(`/api/engines/${eng.name}/jobs`, { method: "POST", json: { params } });
       S.selJob[eng.name] = j.id;
+      if (S.clean) addJobCard(eng.name, j.id, jobTitle(eng, params), true);
       await refreshJobs(eng.name);
       showJob(eng.name, j.id);
     } catch (err) { alertBox(err.message); }
@@ -1810,9 +1866,12 @@ async function pollJobs() {
   if (document.hidden) return;
   const name = S.sideTab;
   if (S.engines.find((e) => e.name === name)) await refreshJobs(name);
+  const live = (n) => (S.jobs[n] || []).some((j) => j.status === "running" || j.status === "queued");
+  const cards = new Set(S.clean ? S.ask.filter((m) => m.role === "job" && !["done", "error", "cancelled"].includes(m.st)).map((m) => m.engine) : []);
   for (const e of S.engines)
-    if (e.online && e.name !== name && (S.jobs[e.name] || []).some((j) => j.status === "running" || j.status === "queued")) await refreshJobs(e.name);
+    if (e.online && e.name !== name && (live(e.name) || cards.has(e.name))) await refreshJobs(e.name);
   renderTabs();
+  if (S.clean) { updateJobCards(); renderNavEngines(); }
 }
 
 function sigClass(s) {
@@ -1974,19 +2033,21 @@ function renderResult(el, r) {
 
 /* ---------- ASK */
 function renderAsk(body) {
+  if (S.clean) return renderAskClean(body);
   const sec = S.panes[S.focus].sec;
   const logEl = h("div", { class: "ask-log", id: "askLog" });
   const ta = h("textarea", { id: "askIn", placeholder: "問任何市場問題，Enter 送出、Shift+Enter 換行。會附上目前視窗標的（股票、ETF、基金）的資料與新聞。" });
   ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); const v = ta.value.trim(); if (v) { ta.value = ""; askSend(v); } } });
   body.append(h("div", { class: "ask" },
     h("div", { class: "ask-ctx" }, "情境標的", h("b", { id: "askCtx" }, sec ? showName(sec) : "（無）"), h("span", { style: "margin-left:auto" }),
-      h("button", { class: "btn ghost", onclick: () => { S.ask = []; renderSide(); } }, "清除")),
+      h("button", { class: "btn ghost", onclick: () => { S.ask = []; saveAsk(); renderSide(); } }, "清除")),
     logEl, h("div", { class: "ask-in" }, ta, h("button", { class: "btn", onclick: () => { const v = ta.value.trim(); if (v) { ta.value = ""; askSend(v); } } }, "送出"))));
   for (const m of S.ask) logEl.append(msgEl(m));
   logEl.scrollTop = logEl.scrollHeight;
 }
 
 function msgEl(m) {
+  if (m.role === "job") return jobCard(m);
   const b = h("div", { class: "body " + (m.role === "assistant" ? "md" : "") });
   if (m.role === "assistant") b.innerHTML = md(m.content); else b.textContent = m.content;
   return h("div", { class: "msg " + m.role }, h("div", { class: "who" }, m.role === "user" ? "YOU" : "OLLAMA"), b);
@@ -2002,7 +2063,7 @@ async function askSend(text) {
   bodyEl.innerHTML = `<span class="loading"></span>`;
   try {
     const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: S.ask.slice(0, -1), security: S.panes[S.focus].sec || null }) });
+      body: JSON.stringify({ messages: S.ask.slice(0, -1).filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content })), security: S.panes[S.focus].sec || null }) });
     const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
     for (;;) {
       const { value, done } = await reader.read(); if (done) break;
@@ -2017,6 +2078,7 @@ async function askSend(text) {
       }
     }
   } catch (e) { reply.content += `\n\n**錯誤**：${e.message}`; bodyEl.innerHTML = md(reply.content); }
+  saveAsk();
 }
 
 /* ---------- settings */
@@ -2036,6 +2098,8 @@ async function renderSettings(body) {
   };
   const m = s.models || {};
   wrap.innerHTML = `
+    <h3>版面</h3>
+    <div class="row"><label>介面</label><div class="seg"><button type="button" data-lay="clean" class="${S.clean ? "on" : ""}">簡潔（導覽＋單頁＋AI）</button><button type="button" data-lay="classic" class="${S.clean ? "" : "on"}">經典終端機（四格）</button></div></div>
     <h3>Ollama 連線</h3>
     <div class="row"><label>Ollama URL</label><input name="ollama_url" value="${esc(s.ollama_url)}"></div>
     <div class="row"><label>狀態</label><span class="${info.ok ? "ok" : "bad"}">${info.ok ? `● 已連線 · ${names.length} 個模型` : "● 無法連線：" + esc(info.error || "")}</span></div>
@@ -2063,6 +2127,7 @@ async function renderSettings(body) {
     <p class="hint" style="margin-top:10px">TradingAgents 需要支援 tool calling 且 context ≥ 32K 的模型（例如 qwen3:32b，或其他 ≥ 32K context 的模型）。一張 24 GB 顯卡通常只放得下一個 27–32B 模型，引擎之間用不同模型會互相換載，第一次會變慢。</p>
     <h3>已安裝模型</h3>
     <div class="mlist">${info.models.map((x) => `<div><b>${esc(x.name)}</b><span>${esc(x.params || "")} ${esc(x.quant || "")} · ${big(x.size)}</span></div>`).join("") || "—"}</div>`;
+  $$("[data-lay]", wrap).forEach((b) => b.addEventListener("click", () => setLayout(b.dataset.lay)));
   $("#saveSet", wrap).addEventListener("click", async () => {
     const g = (n) => $(`[name="${n}"]`, wrap).value;
     const models = {};
@@ -2455,6 +2520,7 @@ async function loadUser() {
 function updateUserBtn() {
   const b = $("#userBtn");
   if (b) b.textContent = S.user ? `👤 ${S.user.username}` : "👤 登入";
+  const n = $("#navUser"); if (n) n.textContent = S.user ? `${S.user.username} · 持股` : "登入";
 }
 function afterAuthChange() {
   if (S.public && !S.user) { location.reload(); return; }  // public URL: back to the login gate
@@ -3719,5 +3785,306 @@ async function fxForecast(chart, code, hz, u, pf, legend) {
     · 80% 區間 ${fxFmt(k(sm.p10_end))}–${fxFmt(k(sm.p90_end))} · 外幣升值機率 ${Math.round(sm.p_up * 100)}%`;
   span.title = "TimesFM 只根據過去匯率做統計預測，不含央行政策、資金流與新聞；色帶是 P10–P90（80%）區間。匯率接近隨機漫步，區間比中位數更有參考價值。";
 }
+
+
+/* ============================================================ 簡潔版面（左導覽＋單一頁面＋右側 AI 助理） */
+const plain = (t) => (S.clean ? String(t || "").replace(/^[^\p{L}\p{N}]+\s*/u, "") : t);   // drop the leading emoji
+
+function goBack() {
+  const prev = S.hist.pop(); if (!prev) return;
+  Object.assign(S.panes[0], prev);
+  savePanes(); renderPane(0);
+}
+
+function setLayout(v) {
+  try { localStorage.setItem("ft.layout", v); } catch (e) {}
+  location.reload();
+}
+
+const NAV = [
+  ["市場", [["FOCUS", "今日焦點"], ["W", "自選清單"], ["TW", "台股"], ["MAG7", "美股科技"], ["WEI", "全球指數"], ["ETF", "台股 ETF"], ["FUND", "基金"], ["SECTOR", "產業分布"]]],
+  ["總經", [["TWMACRO", "台灣總經"], ["MACRO", "美國總經"], ["TWFX", "台幣匯率"], ["FX", "外匯"], ["RATES", "利率"], ["CMDTY", "商品"], ["CRYPTO", "加密貨幣"]]],
+  ["事件", [["EVENTS", "重大事件"], ["SC", "供應鏈"], ["WORLD", "世界事件"]]],
+  ["我的", [["HOLD", "持股"], ["DCA", "定期定額"], ["LEDGER", "分析紀錄"]]],
+  ["研究", [["LAB", "策略研究"], ["DATA", "資料庫"]]],
+];
+const NAV_FN = { ETF: "ETFM", FUND: "FUNDS" };
+const NAV_ICON = {
+  市場: '<path d="M3 17l5-6 4 4 7-9"/><path d="M3 21h18"/>',
+  總經: '<circle cx="12" cy="12" r="8"/><path d="M12 4v8l5 3"/>',
+  事件: '<rect x="4" y="5" width="16" height="15" rx="2"/><path d="M4 10h16M9 3v4M15 3v4"/>',
+  我的: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/>',
+  研究: '<path d="M10 3v6L4 19a1.5 1.5 0 0 0 1.3 2h13.4a1.5 1.5 0 0 0 1.3-2L14 9V3"/><path d="M8 3h8"/>',
+  AI: '<path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/>',
+  自選: '<path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/>',
+};
+const svgIcon = (k) => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">${NAV_ICON[k] || ""}</svg>`;
+
+function navOpenState() {
+  try { return JSON.parse(localStorage.getItem("ft.navOpen") || "null") || { 市場: true, 總經: true, AI: true, 自選: true }; } catch (e) { return { 市場: true }; }
+}
+
+function navGroup(key, label, kids) {
+  const st = navOpenState();
+  const d = h("details", { class: "nav-grp", open: !!st[key], "data-g": key },
+    h("summary", { html: `${svgIcon(key)}<span>${esc(label)}</span>` }), kids);
+  d.addEventListener("toggle", () => { const o = navOpenState(); o[key] = d.open; try { localStorage.setItem("ft.navOpen", JSON.stringify(o)); } catch (e) {} });
+  return d;
+}
+
+function buildNav() {
+  const nav = h("aside", { id: "nav" });
+  const brand = h("div", { class: "nav-brand" }, h("span", { class: "logo" }, "FT"), h("span", {}, "金融終端"));
+  const form = $("#cmdform");
+  $("#cmd").placeholder = "搜尋股票、ETF、基金或指令";
+  const scroll = h("div", { class: "nav-scroll" });
+  for (const [g, items] of NAV) {
+    const box = h("div", { class: "nav-items" });
+    for (const [k, label] of items)
+      box.append(h("button", { class: "nav-it", "data-fn": NAV_FN[k] || k, onclick: () => (k === "DCA" ? openSide("dca") : run(k)) }, label));
+    scroll.append(navGroup(g, g, box));
+  }
+  scroll.append(navGroup("AI", "AI 引擎", h("div", { class: "nav-items", id: "navEngines" })));
+  scroll.append(navGroup("自選", "自選股", h("div", { class: "nav-items nav-watch", id: "navWatch" }, h("div", { class: "nav-empty" }, "載入中…"))));
+  const foot = h("div", { class: "nav-foot" },
+    h("button", { class: "nav-it", onclick: () => run("HELP") }, "說明"),
+    h("button", { class: "nav-it", onclick: () => openSide("settings") }, "設定"),
+    h("button", { class: "nav-it", id: "navUser", onclick: () => setPane(0, { fn: "HOLD" }) }, S.user ? `${S.user.username} · 持股` : "登入"),
+    h("button", { class: "nav-it", title: "切回四格的經典終端機版面（設定裡可再切回來）", onclick: () => setLayout("classic") }, "經典版面"),
+    h("div", { class: "nav-status", id: "navStatus" }));
+  nav.append(brand, form, scroll, foot);
+  $("#main").prepend(nav);
+  $("#main").append(h("div", { class: "nav-scrim", onclick: () => document.body.classList.remove("nav-open") }));
+  updateStatus();
+}
+
+function navActive() {
+  const p = S.panes[0] || {};
+  const fn = PANE_FNS.includes(p.fn) || p.fn === "FUNDD" ? "" : p.fn;
+  $$("#nav .nav-it[data-fn]").forEach((b) => b.classList.toggle("on", b.dataset.fn === fn));
+  $$("#navWatch .nav-it").forEach((b) => b.classList.toggle("on", b.dataset.sym === p.sec && PANE_FNS.includes(p.fn)));
+}
+
+function renderNavEngines() {
+  const box = $("#navEngines"); if (!box) return;
+  box.innerHTML = "";
+  for (const e of S.engines) {
+    const busy = (S.jobs[e.name] || []).some((j) => j.status === "running" || j.status === "queued");
+    box.append(h("button", { class: "nav-it" + (S.sideTab === e.name && !$("#main").classList.contains("side-closed") ? " on" : ""), onclick: () => openSide(e.name) },
+      h("span", { class: "dot " + (busy ? "busy" : e.online ? "on" : "off") }), SHORT[e.name] || e.name));
+  }
+}
+
+function renderNavWatch(rows) {
+  const box = $("#navWatch"); if (!box) return;
+  box.innerHTML = "";
+  if (!rows || !rows.length) { box.append(h("div", { class: "nav-empty" }, "還沒有自選股")); return; }
+  for (const r of rows) {
+    if (r.name) NAMES[r.symbol] = r.name;
+    const label = r.name && (isTW(r.symbol) || r.symbol.startsWith("^")) ? r.name : r.symbol.replace(/\.TWO?$/, "");
+    box.append(h("button", { class: "nav-it nav-q", "data-sym": r.symbol, title: showName(r.symbol), onclick: () => run(r.symbol) },
+      h("span", { class: "nq-n" }, label), h("span", { class: "nq-p " + cls(r.pct) }, r.last == null ? "—" : pct(r.pct))));
+  }
+  navActive();
+}
+
+function renderSideHead(tabs, busy) {
+  const nBusy = S.engines.filter((e) => busy(e.name)).length;
+  const sel = h("select", { class: "side-sel", title: "切換：對話、各 AI 引擎、定期定額、設定", onchange: (e) => openSide(e.target.value) },
+    h("option", { value: "ask" }, "對話"),
+    h("optgroup", { label: "AI 引擎" }, ...S.engines.map((e) => h("option", { value: e.name },
+      `${SHORT[e.name] || e.name}${busy(e.name) ? "（執行中）" : e.online ? "" : "（離線）"}`))),
+    h("option", { value: "dca" }, "定期定額試算"),
+    h("option", { value: "settings" }, "設定"));
+  sel.value = S.sideTab;
+  tabs.append(h("div", { class: "side-hd" },
+    S.sideTab === "ask" ? h("b", {}, "AI 助理") : h("button", { class: "side-back", onclick: () => openSide("ask") }, "‹ 對話"),
+    nBusy ? h("span", { class: "side-busy" }, h("span", { class: "dot busy" }), `${nBusy} 個工作進行中`) : null,
+    h("span", { class: "grow" }), sel,
+    h("button", { class: "side-x", title: "收起（Ctrl+B）", onclick: () => toggleSide(false) }, "✕")));
+}
+
+function saveAsk() {
+  try { localStorage.setItem("ft.ask", JSON.stringify(S.ask.slice(-60))); } catch (e) {}
+}
+
+function jobTitle(eng, params) {
+  const f = (eng.schema || []).find((x) => x.type === "ticker" || x.type === "tickers");
+  const v = f ? String(params[f.name] || "") : "";
+  return v ? v.split(/[,，\s]+/).filter(Boolean).slice(0, 4).map((x) => showName(x)).join("、") : (eng.title || eng.name);
+}
+
+function addJobCard(engine, id, title, quiet) {
+  S.ask.push({ role: "job", engine, id, title, st: "queued", at: Date.now() });
+  saveAsk();
+  refreshJobs(engine).then(() => { updateJobCards(); if (!quiet && S.sideTab === "ask") renderSide(); });
+}
+
+function jobCard(m) {
+  const j = (S.jobs[m.engine] || []).find((x) => x.id === m.id);
+  if (j) m.st = j.status;
+  const st = m.st || "queued";
+  const label = { done: "完成", running: `進行中 ${Math.round((j && j.progress) || 0)}%`, queued: "排隊中", error: "失敗", cancelled: "已取消" }[st] || st;
+  const sum = j ? (j.summary || j.error || (st === "running" ? j.stage : "")) : "";
+  return h("div", { class: "jobcard " + st, "data-job": m.id, title: "打開完整報告",
+    onclick: () => { S.selJob[m.engine] = m.id; openSide(m.engine); if (S.sideTab === m.engine) showJob(m.engine, m.id); } },
+    h("div", { class: "jc-top" }, h("span", { class: "jc-eng" }, SHORT[m.engine] || m.engine), h("span", { class: "jc-st " + st }, label)),
+    h("div", { class: "jc-title" }, m.title || (j && j.title) || m.id),
+    sum ? h("div", { class: "jc-sum" }, sum) : null,
+    st === "running" ? h("div", { class: "jc-bar" }, h("div", { style: `width:${Math.round((j && j.progress) || 3)}%` })) : null,
+    h("div", { class: "jc-go" }, st === "done" ? "看報告 ›" : st === "error" ? "看原因 ›" : "看進度 ›"));
+}
+
+function updateJobCards() {
+  let changed = false;
+  for (const m of S.ask) {
+    if (m.role !== "job") continue;
+    const before = m.st;
+    const el = $(`#askLog .jobcard[data-job="${m.id}"]`);
+    const card = jobCard(m);
+    if (el) el.replaceWith(card);
+    if (m.st !== before) changed = true;
+  }
+  if (changed) saveAsk();
+}
+
+async function quickJob(name, sec, extra = {}) {
+  const eng = S.engines.find((e) => e.name === name);
+  if (!eng || !eng.online) { flash(`${SHORT[name] || name} 引擎離線`); return; }
+  const params = {};
+  for (const f of eng.schema || []) {
+    let v = fieldDefault(f);
+    if ((f.type === "ticker" || f.type === "tickers") && sec) v = sec;
+    if (f.type === "int" && v !== "" && v != null) v = +v;
+    params[f.name] = v === undefined ? null : v;
+  }
+  Object.assign(params, extra);
+  try {
+    const j = await api(`/api/engines/${name}/jobs`, { method: "POST", json: { params } });
+    openSide("ask");
+    addJobCard(name, j.id, jobTitle(eng, params));
+    renderSide();
+  } catch (e) { flash(e.message); }
+}
+
+const QUICK = [["tradingagents", "多代理人分析"], ["kronos", "K 線預測"], ["timesfm", "趨勢預測"], ["laya", "Laya 判斷"]];
+
+function renderAskClean(body) {
+  const sec = S.panes[0].sec && PANE_FNS.includes(S.panes[0].fn) ? S.panes[0].sec : "";
+  S.askSec = sec;
+  const logEl = h("div", { class: "ask-log", id: "askLog" });
+  const ta = h("textarea", { id: "askIn", rows: 1, placeholder: sec ? `問 ${showName(sec)}，或任何市場問題…` : "問任何市場問題…" });
+  const send = () => { const v = ta.value.trim(); if (v) { ta.value = ""; askSend(v); } };
+  ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
+  ta.addEventListener("input", () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 180) + "px"; });
+  const online = (n) => (S.engines.find((e) => e.name === n) || {}).online;
+  const chips = h("div", { class: "ask-chips" });
+  if (sec) for (const [n, label] of QUICK) if (online(n)) chips.append(h("button", { title: `用預設參數跑 ${SHORT[n]}：${showName(sec)}`, onclick: () => quickJob(n, sec) }, `${label}`));
+  if (!S.ask.length) {
+    const sug = sec ? [`${NAMES[sec] || sec} 現在的走勢和風險怎麼看？`, `${NAMES[sec] || sec} 最近有什麼新聞？`, "今天市場的重點是什麼？"]
+      : ["今天市場的重點是什麼？", "台灣景氣燈號和央行利率現在怎樣？", "最近有哪些重大事件要注意？"];
+    logEl.append(h("div", { class: "ask-empty" },
+      h("div", { class: "ae-t" }, "問市場、問個股，或讓 AI 引擎跑一份分析"),
+      h("div", { class: "ae-s" }, ...sug.map((q) => h("button", { onclick: () => askSend(q) }, q)))));
+  }
+  for (const m of S.ask) logEl.append(msgEl(m));
+  body.append(h("div", { class: "ask clean-ask" },
+    logEl,
+    h("div", { class: "ask-dock" },
+      sec ? h("div", { class: "ask-ctx" }, "針對", h("b", {}, showName(sec)), chips) : null,
+      h("div", { class: "ask-box" }, ta, h("button", { class: "ask-send", title: "送出（Enter）", onclick: send }, "↑")),
+      S.ask.length ? h("button", { class: "ask-clear", onclick: () => { S.ask = []; saveAsk(); renderSide(); } }, "清除對話") : null)));
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+/* ---------- 個股總覽（簡潔版面的預設頁）：報酬／風險／交易三欄、走勢、AI 觀點、新聞 */
+function ovStats(rows, q) {
+  const last = q && q.last != null ? q.last : rows[rows.length - 1].close;
+  const day = (d) => d.toISOString().slice(0, 10);
+  const back = (days) => { const t = day(new Date(Date.now() - days * 86400000)); let r = null; for (const x of rows) { if (x.time <= t) r = x; else break; } return r; };
+  const ret = (r) => (r && r.close ? (last / r.close - 1) * 100 : null);
+  const ystart = (() => { const y = String(new Date().getFullYear()); let r = null; for (const x of rows) { if (x.time < y) r = x; else break; } return r; })();
+  const yr = rows.slice(-252);
+  const lr = []; for (let k = 1; k < yr.length; k++) lr.push(Math.log(yr[k].close / yr[k - 1].close));
+  const mean = lr.reduce((a, b) => a + b, 0) / (lr.length || 1);
+  const vol = lr.length > 20 ? Math.sqrt(lr.reduce((a, b) => a + (b - mean) ** 2, 0) / (lr.length - 1)) * Math.sqrt(252) * 100 : null;
+  let peak = -Infinity, mdd = 0; for (const x of yr) { peak = Math.max(peak, x.close); mdd = Math.min(mdd, x.close / peak - 1); }
+  const hi = Math.max(...yr.map((x) => x.high)), lo = Math.min(...yr.map((x) => x.low));
+  const ma = (n) => (rows.length >= n ? rows.slice(-n).reduce((a, x) => a + x.close, 0) / n : null);
+  const vols = rows.slice(-21, -1).map((x) => x.volume || 0); const avgV = vols.length ? vols.reduce((a, b) => a + b, 0) / vols.length : null;
+  const lastV = rows[rows.length - 1].volume;
+  return { last, d1: q && q.pct, m1: ret(back(30)), m3: ret(back(91)), ytd: ret(ystart), y1: ret(back(365)), vol, mdd: mdd * 100,
+           fromHi: (last / hi - 1) * 100, fromLo: (last / lo - 1) * 100, hi, lo, ma20: ma(20), ma60: ma(60), avgV, lastV, vr: avgV ? lastV / avgV : null };
+}
+
+function ovGroup(title, rows) {
+  return h("div", { class: "ov-grp" }, h("div", { class: "ov-gt" }, title),
+    ...rows.map(([k, v, c, tip]) => h("div", { class: "ov-row", title: tip || "" }, h("span", { class: "ov-k" }, k), h("span", { class: "ov-v " + (c || "") }, v))));
+}
+
+async function renderOV(i, body, p) {
+  const sec = p.sec;
+  body.classList.add("ov");
+  body.innerHTML = `<div class="loading">載入 ${esc(showName(sec))}</div>`;
+  let rows, q;
+  try {
+    [rows, q] = await Promise.all([api(`/api/history?s=${encodeURIComponent(sec)}&range=2y&interval=1d`),
+                                   api(`/api/quotes?s=${encodeURIComponent(sec)}`).then((x) => x[0]).catch(() => null)]);
+  } catch (e) { body.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  if (S.panes[i].sec !== sec || S.panes[i].fn !== "OV") return;
+  body.innerHTML = "";
+  if (!rows.length) { body.append(h("div", { class: "empty" }, `${sec} 沒有資料（代號可能錯誤？台股可直接輸入 2330 或「台積電」）`)); return; }
+  const s = ovStats(rows, q); const d = pxd(s.last);
+  const tw = isTW(sec);
+  const vfmt = (v) => (v == null ? "—" : tw ? nf(v / 1000, 0) + " 張" : big(v));
+  const pos = (ma) => (ma == null ? ["—", ""] : [`${s.last >= ma ? "站上" : "跌破"} ${nf(ma, d)}`, s.last >= ma ? "up" : "down"]);
+  const [p20, c20] = pos(s.ma20), [p60, c60] = pos(s.ma60);
+  body.append(h("div", { class: "ov-meta" },
+    h("span", {}, sec.replace(/\.TWO?$/, "")), h("span", {}, "日線"), h("span", {}, `${rows[0].time} → ${rows[rows.length - 1].time}`),
+    q && q.currency ? h("span", {}, q.currency) : null, h("span", { class: "grow" }),
+    h("button", { class: "linkish", onclick: () => setPane(i, { fn: "GP" }) }, "完整走勢圖 ›")));
+  body.append(h("div", { class: "ov-grid" },
+    ovGroup("報酬", [["今日", pct(s.d1), cls(s.d1)], ["近 1 個月", pct(s.m1), cls(s.m1)], ["近 3 個月", pct(s.m3), cls(s.m3)], ["今年以來", pct(s.ytd), cls(s.ytd)], ["近 1 年", pct(s.y1), cls(s.y1)]]),
+    ovGroup("風險", [["年化波動", s.vol == null ? "—" : s.vol.toFixed(1) + "%", "", "近一年日報酬標準差 × √252"], ["最大回撤（1 年）", pct(s.mdd), "down", "近一年從高點的最大跌幅"],
+                     ["距 52 週高", pct(s.fromHi), cls(s.fromHi), `52 週高 ${nf(s.hi, d)}`], ["距 52 週低", pct(s.fromLo), cls(s.fromLo), `52 週低 ${nf(s.lo, d)}`]]),
+    ovGroup("交易", [["成交量", vfmt(s.lastV)], ["20 日均量", vfmt(s.avgV)], ["量比", s.vr == null ? "—" : s.vr.toFixed(2) + "×", s.vr > 1.5 ? "warn" : ""], ["月線 MA20", p20, c20], ["季線 MA60", p60, c60]])));
+  const box = h("div", { class: "chart-box ov-chart" });
+  body.append(h("div", { class: "ov-sec" }, h("div", { class: "ov-st" }, h("span", {}, "近一年走勢"), h("span", { class: "ov-leg" }, h("i", { style: "background:#ff9960" }), "MA20", h("i", { style: "background:#5b7a9e" }), "MA60")), box));
+  requestAnimationFrame(() => { if (S.panes[i].sec === sec && S.panes[i].fn === "OV") drawCandles(i, box, rows.slice(-250), true); });
+
+  const aiBox = h("div", { class: "ov-ai" }, h("div", { class: "hint" }, "讀取 AI 觀點…"));
+  const online = (n) => (S.engines.find((e) => e.name === n) || {}).online;
+  const acts = h("div", { class: "ov-acts" }, ...QUICK.filter(([n]) => online(n)).map(([n, label]) => h("button", { class: "btn ghost", onclick: () => quickJob(n, sec) }, label)),
+    h("button", { class: "btn ghost", onclick: () => { openSide("ask"); setTimeout(() => $("#askIn") && $("#askIn").focus(), 60); } }, "問 AI"));
+  body.append(h("div", { class: "ov-sec" }, h("div", { class: "ov-st" }, h("span", {}, "AI 觀點"), h("span", { class: "grow" }),
+    h("button", { class: "linkish", onclick: () => setPane(i, { fn: "LEDGER", lgQ: sec.replace(/\.TWO?$/, "") }) }, "全部紀錄 ›")), aiBox, acts));
+  const newsBox = h("div", { class: "ov-news" }, h("div", { class: "hint" }, "讀取新聞…"));
+  body.append(h("div", { class: "ov-sec" }, h("div", { class: "ov-st" }, h("span", {}, "新聞"), h("span", { class: "grow" }),
+    h("button", { class: "linkish", onclick: () => setPane(i, { fn: "N" }) }, "更多 ›")), newsBox));
+
+  api(`/api/ledger?ticker=${encodeURIComponent(sec.replace(/\.TWO?$/, ""))}&limit=40`).then((r) => {
+    if (S.panes[i].sec !== sec) return;
+    const seen = new Set(); const recs = [];
+    for (const x of r.records || []) { if (x.ticker !== sec || seen.has(x.engine)) continue; seen.add(x.engine); recs.push(x); }
+    aiBox.innerHTML = "";
+    if (!recs.length) { aiBox.append(h("div", { class: "hint" }, "還沒有 AI 分析過這檔。下面的按鈕會用預設參數跑一份，結果出現在右側對話裡。")); return; }
+    for (const x of recs.slice(0, 6))
+      aiBox.append(h("div", { class: "ov-airow", title: x.summary || "", onclick: () => { S.selJob[x.engine] = x.job_id; openSide(x.engine); } },
+        h("span", { class: "oa-e" }, SHORT[x.engine] || x.engine),
+        h("span", { class: "oa-s " + (x.dir > 0 ? "up" : x.dir < 0 ? "down" : "") }, String(x.signal || "—").slice(0, 40)),
+        h("span", { class: "oa-t" }, timeAgo(x.created))));
+  }).catch(() => { aiBox.innerHTML = ""; aiBox.append(h("div", { class: "hint" }, "分析紀錄讀不到")); });
+
+  api(`/api/news?s=${encodeURIComponent(sec)}&lang=${tw ? "zh" : "en"}`).then((items) => {
+    if (S.panes[i].sec !== sec) return;
+    newsBox.innerHTML = "";
+    if (!items.length) { newsBox.append(h("div", { class: "hint" }, "沒有新聞")); return; }
+    for (const n of items.slice(0, 6))
+      newsBox.append(h("div", { class: "news-item" }, h("span", { class: "t" }, timeAgo(n.time)),
+        h("span", { class: "h" }, n.link ? h("a", { href: n.link, target: "_blank", rel: "noopener" }, n.title) : n.title),
+        h("span", { class: "src" }, n.publisher || "")));
+  }).catch(() => { newsBox.innerHTML = ""; });
+}
+
 
 boot();
