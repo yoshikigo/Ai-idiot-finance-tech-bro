@@ -402,6 +402,72 @@ def get_statement(kind: str, market: str, year: int, quarter: int) -> dict[str, 
 
 
 # ---------------------------------------------------------------- availability (公布日對齊)
+# ---------------------------------------------------------------- 處置股 (disposition: matching by 分盤 / 預收款券)
+_DATE = re.compile(r"(\d{2,4})\s*[/.\-年]\s*(\d{1,2})\s*[/.\-月]\s*(\d{1,2})")
+
+
+def _tw_date(y: str, m: str, d: str) -> dt.date | None:
+    yy = int(y)
+    yy = yy + 1911 if yy < 1000 else yy
+    try:
+        return dt.date(yy, int(m), int(d))
+    except ValueError:
+        return None
+
+
+def parse_dates(text) -> list[dt.date]:
+    """Every date in a cell: '115/07/22～115/08/04', '2026/07/22 ~ 2026/08/04', '1150722' …"""
+    t = re.sub(r"<[^>]+>", " ", htmlmod.unescape(str(text or "")))
+    out = [d for d in (_tw_date(*m) for m in _DATE.findall(t)) if d]
+    if not out:
+        for m in re.findall(r"(?<!\d)(\d{3})(\d{2})(\d{2})(?!\d)", t):
+            d = _tw_date(*m)
+            if d:
+                out.append(d)
+    return out
+
+
+def parse_disposal(payload: dict) -> list[tuple[str, dt.date, dt.date, str]]:
+    """→ [(code, start, end, reason)] from a TWSE「公布處置有價證券」/ TPEx「處置有價證券」JSON answer.
+    The column layout differs by market and vintage, so columns are found by their header."""
+    _stat_ok(payload)
+    out = []
+    for fields, rows in _tables(payload):
+        if not fields:
+            continue
+        i_code = _idx(fields, r"代號")
+        i_per = _idx(fields, r"處置起迄|處置期間|起迄|期間")
+        i_from = _idx(fields, r"處置起|開始")
+        i_to = _idx(fields, r"處置迄|結束|迄日")
+        i_why = _idx(fields, r"處置條件|處置原因|原因|條件")
+        if i_code is None or (i_per is None and i_from is None):
+            continue
+        for r in rows:
+            if not isinstance(r, (list, tuple)) or i_code >= len(r):
+                continue
+            code = re.sub(r"<[^>]+>", "", str(r[i_code])).strip()
+            if not CODE_RE.match(code):
+                continue
+            ds = parse_dates(r[i_per]) if i_per is not None and i_per < len(r) else []
+            if len(ds) < 2 and i_from is not None and i_to is not None and max(i_from, i_to) < len(r):
+                ds = parse_dates(r[i_from])[:1] + parse_dates(r[i_to])[:1]
+            if len(ds) < 2:
+                continue
+            why = str(r[i_why]).strip()[:60] if i_why is not None and i_why < len(r) else ""
+            out.append((code, min(ds[0], ds[1]), max(ds[0], ds[1]), why))
+    if not out and any(rows for _, rows in _tables(payload)):
+        raise SourceError("回應裡有表格但找不到處置股的代號／期間欄位（格式可能改了）")
+    return out
+
+
+def get_disposal(market: str, start: dt.date, end: dt.date) -> list[tuple[str, dt.date, dt.date, str]]:
+    if market == "上市":
+        return parse_disposal(_json(f"{TWSE}/announcement/punish",
+                                    {"startDate": start.strftime("%Y%m%d"), "endDate": end.strftime("%Y%m%d"), "response": "json"}))
+    return parse_disposal(_json(f"{TPEX_NEW}/bulletin/disposal",
+                                {"startDate": start.strftime("%Y/%m/%d"), "endDate": end.strftime("%Y/%m/%d"), "response": "json"}))
+
+
 def revenue_available(year: int, month: int) -> dt.date:
     """月營收法定公布期限：次月 10 日。"""
     y, m = (year + 1, 1) if month == 12 else (year, month + 1)

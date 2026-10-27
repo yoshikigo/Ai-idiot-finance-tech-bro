@@ -194,7 +194,7 @@ def run(ctx: Ctx) -> dict:
             pm_prompt += (f"\n\n注意：{t} 是 ETF，沒有自己的財報；上面評估的是它的前 {len(e['holdings'])} 大成分股（"
                           + "、".join(f"{s} {n} 權重 {w:.1f}%" for s, n, w in e["holdings"])
                           + "）。請依權重把成分股的看法彙整成對這檔 ETF 的建議，並提醒成分股只涵蓋部分權重。")
-    pm = ollama.ask(llm, "You are the portfolio manager of a long-only fund. Synthesise the agents' views into "
+    pm = ollama.ask(llm, ollama.RULES_EN + "You are the portfolio manager of a long-only fund. Synthesise the agents' views into "
                          "a short allocation memo: for each ticker give the consensus, key agreements/disagreements, "
                          "and a suggested action (buy/add/hold/trim/avoid) with sizing guidance. Be concise, use markdown.",
                     pm_prompt, language=lang)

@@ -21,7 +21,7 @@ from fastapi import HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 
 from ft_common.engine import Ctx, Engine, serve, table
-from ft_common.research import ai, backtest, collect, expr, fields as F, presets, store
+from ft_common.research import ai, backtest, collect, expr, fields as F, presets, store, track, validate
 
 SCHEMA = [
     {"name": "mode", "label": "策略來源", "type": "select", "default": "preset",
@@ -33,6 +33,7 @@ SCHEMA = [
      "placeholder": "例：找營收連續三個月成長、本益比低於 20、投信最近在買的股票，每月換股"},
     {"name": "spec", "label": "策略 JSON（JSON 模式）", "type": "textarea"},
     {"name": "start", "label": "回測起點", "type": "date", "default": "2016-01-01"},
+    {"name": "validate", "label": "加做可信度檢查（隨機選股檢定、樣本內外、參數掃描與樣本外前進，約多 10–60 秒）", "type": "bool", "default": True},
 ]
 
 
@@ -88,6 +89,22 @@ def report_md(r: dict, expl: str = "") -> str:
         lines += [f"## 最新選股名單（{pk['date']}，符合條件 {pk['n_match']} 檔）", ""]
         lines += [f"- {x['code']} {x['name']}" + (f"（分數 {x['score']}）" if x.get("score") is not None else "") for x in pk["rows"]]
         lines.append("")
+    v = r.get("validation")
+    if v:
+        rt = v["random"]
+        lines += ["## 可信度檢查", ""] + [f"- {x}" for x in v["verdict"]]
+        sc = v.get("scan") or {}
+        lines += [f"- {x}" for x in sc.get("notes", [])]
+        lines += ["", f"_{v['method']}_", ""]
+        if sc.get("walk_forward", {}).get("folds"):
+            lines += ["| 年度 | 樣本外選到的參數 | 那年報酬 | 固定目前參數 |", "|---|---|---:|---:|"]
+            lines += [f"| {f['year']} | {', '.join(str(x) for x in f['chosen'])} | {fmt(f['test_ret'], 1, True)} | {fmt(f['current_ret'], 1, True)} |"
+                      for f in sc["walk_forward"]["folds"]]
+            lines.append("")
+        lines += [f"隨機選股 {rt['n']} 組：年化中位數 {fmt(rt['random']['cagr_median'], 1, True)}"
+                  f"（90% 範圍 {fmt(rt['random']['cagr_p5'], 1, True)} ～ {fmt(rt['random']['cagr_p95'], 1, True)}），p = {rt['p_value']}", ""]
+    if r.get("disposal"):
+        lines += [f"> {r['disposal']}", ""]
     lines += ["## 注意", ""] + [f"- {n}" for n in r["notes"]] + ["", "_歷史回測僅供研究，不代表未來績效，不構成投資建議。_"]
     return "\n".join(lines)
 
@@ -97,6 +114,13 @@ def run(ctx: Ctx) -> dict:
     ctx.log("spec: " + json.dumps(spec, ensure_ascii=False))
     ctx.step(40, "回測中")
     r = backtest.run(spec)
+    if ctx.params.get("validate", True) not in (False, "false", "0", 0):
+        ctx.step(70, "可信度檢查（隨機選股、參數掃描）")
+        try:
+            ps = [p["id"] for p in validate.numeric_params(spec)]
+            r["validation"] = validate.run(spec, params=[x for x in ps if x != "top_n"][:2] or ["top_n"])
+        except Exception as e:  # noqa: BLE001
+            ctx.log(f"可信度檢查失敗：{e}")
     m = r["metrics"]
     ctx.log(f"CAGR {m['cagr']} Sharpe {m['sharpe']} MDD {m['mdd']} trades {m['trades']}")
     yearly = [[y["year"], fmt(y["ret"], 1, True), fmt(y.get("bench"), 1, True)] for y in r["yearly"]]
@@ -184,6 +208,53 @@ async def ai_api(req: Request):
         raise HTTPException(503, f"Ollama 無法使用：{e}") from e
 
 
+@app.post("/validate")
+async def validate_api(req: Request):
+    b = await req.json()
+    try:
+        return await run_in_threadpool(validate.run, b.get("spec") or {}, b.get("params"), b.get("n"))
+    except (backtest.SpecError, expr.ExprError, ValueError) as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.get("/tracks")
+def tracks_list():
+    out = []
+    for t in track.all_tracks():
+        lt = t.get("last") or {}
+        out.append({k: t.get(k) for k in ("id", "name", "t0", "status", "created", "updated", "error")} |
+                   {"last": {k: lt.get(k) for k in ("date", "days", "ret", "bench_ret", "expected", "lo", "hi", "status", "action",
+                                                    "next_rebalance", "mdd")},
+                    "rebalance": backtest.REBALANCE.get(t["spec"]["rebalance"]), "benchmark": t["spec"]["benchmark"]})
+    return out
+
+
+@app.post("/tracks")
+async def tracks_create(req: Request):
+    b = await req.json()
+    try:
+        return await run_in_threadpool(track.create, b.get("spec") or {}, b.get("name"))
+    except (backtest.SpecError, expr.ExprError, ValueError) as e:
+        raise HTTPException(400, str(e)) from e
+
+
+@app.get("/tracks/{tid}")
+def tracks_get(tid: str):
+    try:
+        return track._load(tid)  # noqa: SLF001
+    except FileNotFoundError as e:
+        raise HTTPException(404, "沒有這個追蹤") from e
+
+
+@app.post("/tracks/{tid}")
+async def tracks_action(tid: str, req: Request):
+    b = await req.json()
+    try:
+        return await run_in_threadpool(track.action, tid, b.get("action") or "refresh") or {"deleted": tid}
+    except FileNotFoundError as e:
+        raise HTTPException(404, "沒有這個追蹤") from e
+
+
 @app.post("/check")
 async def check_api(req: Request):
     b = await req.json()
@@ -212,6 +283,7 @@ async def collector_api(req: Request):
 def _start():
     if os.environ.get("FT_RESEARCH_COLLECT", "1") not in ("0", "false", "no"):
         threading.Thread(target=collect.loop_forever, daemon=True, name="research-collector").start()
+    threading.Thread(target=track.loop_forever, args=(collect._stop,), daemon=True, name="strategy-tracks").start()  # noqa: SLF001
 
 
 if __name__ == "__main__":

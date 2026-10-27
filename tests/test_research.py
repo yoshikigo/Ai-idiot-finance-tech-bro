@@ -300,3 +300,100 @@ def test_no_data_message_explains_progress(R):
     with pytest.raises(bt.SpecError) as e:
         bt.run({"conditions": ["營收年增率 > 20"], "universe": {"min_value": 0}})
     assert "失敗 1 批" in str(e.value) and "頁面沒有營收表格" in str(e.value)
+
+
+# ---------------------------------------------------------------- 可信度檢查 (validate.py) and 處置股
+def test_fast_sim_matches_full_backtest_without_costs(R):
+    store, F, expr, collect, bt = R
+    from ft_common.research import validate as V
+    importlib.reload(V)
+    _prices(store, {"9001": 0.004, "9002": 0.0, "9003": -0.002})
+    spec = {"conditions": ["收盤價 > 0"], "rank": "收盤價", "top_n": 1, "rebalance": "M", "start": "2024-01-01",
+            "fee_discount": 0, "slippage": 0, "max_weight": 1, "universe": {"min_value": 0, "market": "all"}, "benchmark": "9002"}
+    P = bt.prepare(spec)
+    sim = V.Sim(P)
+    r = sim.run(sim.picks(P["cond"], P["score"]))
+    full = bt.run(spec)
+    assert (1 + r).prod() == pytest.approx(full["curve"][-1]["v"], rel=1e-3)
+
+
+def test_random_test_and_scan(R):
+    store, F, expr, collect, bt = R
+    from ft_common.research import validate as V
+    importlib.reload(V)
+    _prices(store, {f"90{k:02d}": g for k, g in enumerate([0.004, 0.003, 0.0, -0.001, -0.002, 0.001, 0.0005, -0.0005], 1)},
+            start="2020-01-01", n=1300)
+    spec = {"conditions": ["收盤價 > 50"], "rank": "收盤價", "top_n": 2, "rebalance": "M", "start": "2020-01-01",
+            "fee_discount": 0.6, "slippage": 0.001, "max_weight": 0.5, "universe": {"min_value": 0, "market": "all"}}
+    out = V.run(spec, params=["c0:0", "top_n"], n=60)
+    rt = out["random"]
+    # always holding the two best growers beats random pairs
+    assert rt["p_value"] < 0.05 and rt["strategy"]["cagr"] > rt["random"]["cagr_median"]
+    assert out["verdict"][0].startswith("✓") and len(rt["curve"]) > 50
+    sc = out["scan"]
+    assert len(sc["sharpe"]) == 5 and len(sc["sharpe"][0]) == 5 and sc["current"] == [2, 1]
+    assert sc["walk_forward"]["folds"] and sc["walk_forward"]["oos"]["sharpe"] is not None
+    assert [p["id"] for p in V.numeric_params(spec)] == ["c0:0", "top_n"]
+    assert V.apply_param(spec, "c0:0", 70)["conditions"] == ["收盤價 > 70"]
+    assert V.grid_values(2, True) == [1, 2, 3, 4, 5] and V.grid_values(10, True) == [6, 8, 10, 12, 14]
+
+
+def test_disposal_parser_and_mask(R):
+    store, F, expr, collect, bt = R
+    from ft_common.research import sources
+    twse = {"stat": "OK", "fields": ["編號", "公布日期", "證券代號", "證券名稱", "累計", "處置條件", "處置起迄時間", "處置措施", "處置內容", "備註"],
+            "data": [["1", "115/07/21", "2330", "台積電", "3", "連續三次", "115/07/22～115/08/04", "第一次處置", "...", ""],
+                     ["2", "115/07/21", "合計", "", "", "", "", "", "", ""]]}
+    assert sources.parse_disposal(twse) == [("2330", dt.date(2026, 7, 22), dt.date(2026, 8, 4), "連續三次")]
+    tpex = {"tables": [{"fields": ["序號", "公告日期", "證券代號", "證券名稱", "處置起日", "處置迄日", "處置原因"],
+                        "data": [["1", "2026/07/21", "6488", "環球晶", "2026/07/22", "2026/08/04", "漲跌幅異常"]]}]}
+    assert sources.parse_disposal(tpex)[0][:3] == ("6488", dt.date(2026, 7, 22), dt.date(2026, 8, 4))
+    assert sources.parse_disposal({"stat": "OK", "fields": ["證券代號", "處置起迄時間"], "data": []}) == []
+    with pytest.raises(sources.SourceError):
+        sources.parse_disposal({"stat": "OK", "fields": ["甲", "乙"], "data": [["1", "2"]]})
+    days = _prices(store, {"9001": 0.004, "9002": 0.001})
+    store.upsert("disposal", [("9001", days[50].date().isoformat(), days[60].date().isoformat(), "上市", "x")])
+    store.bump_version()
+    spec = {"conditions": ["收盤價 > 0"], "rank": "收盤價", "top_n": 1, "rebalance": "D", "start": "2024-01-01",
+            "fee_discount": 0, "slippage": 0, "max_weight": 1, "universe": {"min_value": 0}}
+    P = bt.prepare(spec)
+    assert not P["mask"].loc[days[55], "9001"] and P["mask"].loc[days[55], "9002"] and P["mask"].loc[days[45], "9001"]
+    assert "已排除處置" in bt.run(spec)["disposal"]
+    P2 = bt.prepare({**spec, "universe": {"min_value": 0, "exclude_disposal": False}})
+    assert P2["mask"].loc[days[55], "9001"]
+
+
+def test_forward_track_freezes_picks_and_writes_notes(R, tmp_path, monkeypatch):
+    store, F, expr, collect, bt = R
+    from ft_common import notes
+    from ft_common.research import track as T
+    importlib.reload(notes)
+    T = importlib.reload(T)
+    monkeypatch.setattr(notes, "OUTBOX", tmp_path / "outbox")
+    monkeypatch.setattr(notes, "SETTINGS", tmp_path / "settings.json")
+    days = _prices(store, {"9001": 0.004, "9002": 0.001, "9003": -0.002}, start="2024-01-01", n=300)
+    spec = {"name": "測試策略", "conditions": ["收盤價 > 0"], "rank": "收盤價", "top_n": 1, "rebalance": "M", "start": "2024-01-01",
+            "fee_discount": 0, "slippage": 0, "max_weight": 1, "universe": {"min_value": 0}, "benchmark": "9002"}
+    # start tracking "in the past": pretend the data ended 120 trading days ago, then let the days arrive
+    cut = days[180]
+    real_cal = F.calendar
+    monkeypatch.setattr(F, "calendar", lambda: real_cal()[real_cal() <= cut])
+    t = T.create(spec)
+    assert t["t0"] == cut.date().isoformat() and t["issued"][t["t0"]] == ["9001"] and t["last"]["days"] == 0
+    monkeypatch.setattr(F, "calendar", real_cal)
+    t = T.update(T._load(t["id"]), force=True)
+    lt = t["last"]
+    assert lt["days"] == 119 and lt["ret"] > 0 and lt["holdings"][0]["code"] == "9001"
+    assert [c["h"] for c in lt["checks"] if "actual" in c] == [20, 60]
+    assert all(v == ["9001"] for v in t["issued"].values()) and len(t["issued"]) >= 5
+    ov = (tmp_path / "outbox" / T.folder(t) / "總覽.md").read_text()
+    assert "實際 vs 回測預期" in ov and "9001" in ov and "到期核對" in ov
+    assert (tmp_path / "outbox" / T.folder(t) / f"{t['t0']} 換股.md").exists()
+    # a frozen list is never rewritten, even if later data would pick something else
+    k = sorted(t["issued"])[1]
+    t["issued"][k] = ["9003"]
+    t2 = T.update(t, force=True)
+    assert t2["issued"][k] == ["9003"]
+    assert any(tr["code"] == "9003" for tr in t2["last"]["trades"]) or any(h["code"] == "9003" for h in t2["last"]["holdings"])
+    assert T.action(t["id"], "pause")["status"] == "paused" and T.update_all() == 0
+    assert T.action(t["id"], "delete") is None and T.all_tracks() == []

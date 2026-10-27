@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 
 import httpx
@@ -389,7 +390,8 @@ async def api_research(path: str, req: Request):
     url = ENGINES.get("research")
     if not url:
         raise HTTPException(404, "沒有設定 research 引擎")
-    if path not in ("catalog", "series", "backtest", "screen", "ai", "check", "collector"):
+    if path not in ("catalog", "series", "backtest", "screen", "ai", "check", "collector", "validate", "tracks") \
+            and not re.fullmatch(r"tracks/[\w-]{6,40}", path):
         raise HTTPException(404, "unknown research endpoint")
     try:
         async with httpx.AsyncClient(timeout=900) as c:
@@ -562,7 +564,7 @@ async def api_ask(req: Request):
         except Exception:  # noqa: BLE001
             pass
     ctx_text = "\n\n".join(parts)
-    system = ("你是專業金融終端機裡的市場分析師。回答精確、簡潔，引用下方提供的數字；資料缺漏要明講，絕不編造價格或淨值。"
+    system = (ollama.RULES_ZH + "你是專業金融終端機裡的市場分析師。回答精確、簡潔，引用下方提供的數字；資料缺漏要明講，絕不編造價格或淨值。"
               "台股漲跌以紅漲綠跌的習慣描述即可，金額單位用元、億元。不構成投資建議。"
               + ollama.LANG_HINT.get(s.get("language"), "") + "\n\n" + ctx_text)
     msgs = [{"role": "system", "content": system}] + [m for m in body.get("messages", []) if m.get("role") in ("user", "assistant")][-12:]
@@ -774,7 +776,7 @@ async def api_focus_ai(req: Request):
     llm = ollama.resolve(llm_block(s), "ask")
     text = await run_in_threadpool(
         ollama.ask, llm,
-        "你是台股盤後分析師。根據下方今天的指數、供應鏈題材漲跌、強弱勢股、三大法人與新聞標題，寫一份繁體中文「今日焦點」："
+        ollama.RULES_ZH + "你是台股盤後分析師。根據下方今天的指數、供應鏈題材漲跌、強弱勢股、三大法人與新聞標題，寫一份繁體中文「今日焦點」："
         "1) 一句話總結盤勢；2) 3–5 個今天最重要的題材／供應鏈環節，各說明發生什麼、哪些個股反應；3) 明天要注意的事。"
         "只能用下方提供的資料，數字照抄，不要編造；新聞只有標題，不要推測細節。用 Markdown，簡潔。不構成投資建議。",
         focus.ai_context(d), language=s.get("language"))
@@ -1010,7 +1012,7 @@ async def api_dca_ai(req: Request):
     if not txt:
         raise HTTPException(400, "先跑回測")
     s = load_settings()
-    system = ("你是審慎的理財顧問。根據使用者提供的「定期定額回測數字」評估：哪個標的表現較好、報酬來自哪裡（長期趨勢或期末反彈）、"
+    system = (ollama.RULES_ZH + "你是審慎的理財顧問。根據使用者提供的「定期定額回測數字」評估：哪個標的表現較好、報酬來自哪裡（長期趨勢或期末反彈）、"
               "定期定額相對單筆投入的優劣、最大回撤代表的持有難度、扣款頻率與手續費的影響，以及適合怎樣的投資人。"
               "只能引用提供的數字，不要編造；過去績效不代表未來；最後一句提醒這不是投資建議。用繁體中文，條列為主，600 字內。")
     try:

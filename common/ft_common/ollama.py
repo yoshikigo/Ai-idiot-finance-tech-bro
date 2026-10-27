@@ -24,6 +24,26 @@ LANG_HINT = {
 }
 
 
+# 寫作規則（參考 Blave Agent 的報告規範）：放在系統提示最前面——固定不變的開頭也讓 Ollama 能重用已讀過的前綴
+RULES_ZH = ("寫作規則（一定要遵守）：\n"
+            "1. 開頭先給一個之後能用實際價格或數據核對對錯的主張（例如「20 個交易日內守住月線」），不要模稜兩可。\n"
+            "2. 每個數字都附比較基準：和前一期、平均、門檻或同業比；只丟一個數字沒有意義。\n"
+            "3. 每個數字都說明「所以呢」：它支持還是削弱你的主張。\n"
+            "4. 一定要寫反方：什麼情況代表你錯了、要盯哪個指標。\n"
+            "5. 不寫哪一天都成立的空話（例如「市場有風險」「留意波動」）。\n"
+            "6. 資料不足就直說「資料不足，無法判斷」，不要硬湊結論。\n"
+            "7. 數字照提供的資料寫，不估算、不美化；沒有的資料就說沒有。\n\n")
+RULES_EN = ("Writing rules (follow strictly):\n"
+            "1. Lead with one claim that can later be checked against actual prices or data (e.g. 'holds above the 20-day "
+            "moving average over the next 20 trading days'); no hedged non-answers.\n"
+            "2. Give every number a comparison — previous period, average, threshold or peer; a lone number says nothing.\n"
+            "3. Say what each number means for the claim (supports it or weakens it).\n"
+            "4. Always write the other side: what would prove you wrong and which indicator to watch.\n"
+            "5. No sentence that would be true on any day ('markets are volatile', 'watch the risks').\n"
+            "6. If the data is insufficient, say so plainly instead of forcing a conclusion.\n"
+            "7. Quote numbers exactly as given; never estimate, embellish or invent — missing data is reported as missing.\n\n")
+
+
 def resolve(llm: dict | None, key: str | None = None) -> dict:
     """Fill defaults; `key` picks a per-engine model override (llm['models'][key])."""
     llm = dict(llm or {})

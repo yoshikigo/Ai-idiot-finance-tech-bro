@@ -270,7 +270,7 @@ def run(ctx: Ctx) -> dict:
             facts += "\n回測期間發生的事件：" + "；".join(f"{e['date']} {e['title']}" for e in world_info["backtest_events"][:6])
     if llm.get("context"):
         facts += "\n\n" + llm["context"]
-    commentary = ollama.ask(llm, "You explain statistical time-series forecasts to a retail investor. TimesFM is a "
+    commentary = ollama.ask(llm, ollama.RULES_EN + "You explain statistical time-series forecasts to a retail investor. TimesFM is a "
                                  "zero-shot foundation model that only sees past prices — no news, fundamentals or events "
                                  "(unless world covariates are stated as used). "
                                  "Explain the median path and the uncertainty band, what the backtest says about reliability "

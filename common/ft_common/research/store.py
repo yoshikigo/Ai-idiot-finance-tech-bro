@@ -32,6 +32,8 @@ CREATE TABLE IF NOT EXISTS income_ytd(code TEXT, period TEXT, avail TEXT, revenu
     net_income REAL, net_parent REAL, eps REAL, PRIMARY KEY(code, period)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS balance(code TEXT, period TEXT, avail TEXT, assets REAL, liabilities REAL, equity REAL,
     equity_parent REAL, capital REAL, PRIMARY KEY(code, period)) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS disposal(code TEXT, start TEXT, end TEXT, market TEXT, reason TEXT,
+    PRIMARY KEY(code, start)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS fetch_log(dataset TEXT, market TEXT, key TEXT, status TEXT, rows INTEGER, error TEXT,
     tries INTEGER DEFAULT 0, ts TEXT, PRIMARY KEY(dataset, market, key)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS meta(k TEXT PRIMARY KEY, v TEXT);
@@ -45,8 +47,9 @@ TABLE_COLS = {
     "revenue": ("avail", "revenue", "mom", "yoy", "cum", "cum_yoy"),
     "income_ytd": ("avail", "revenue", "gross", "op_income", "pretax", "net_income", "net_parent", "eps"),
     "balance": ("avail", "assets", "liabilities", "equity", "equity_parent", "capital"),
+    "disposal": ("end", "market", "reason"),
 }
-KEYCOL = {"revenue": "period", "income_ytd": "period", "balance": "period"}
+KEYCOL = {"revenue": "period", "income_ytd": "period", "balance": "period", "disposal": "start"}
 
 
 def _connect() -> sqlite3.Connection:

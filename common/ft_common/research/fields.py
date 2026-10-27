@@ -39,6 +39,8 @@ DATASETS = {
                 "note": "以法定公布期限（次月 10 日）對齊，避免前視偏差"},
     "financials": {"name": "財務報表（季）", "freq": "季", "table": "income_ytd", "source": "公開資訊觀測站 t163sb04／t163sb05 彙總表",
                    "note": "損益表為累計數，已換算單季；以法定期限（5/15、8/14、11/14、3/31）對齊"},
+    "disposal": {"name": "處置股", "freq": "期間", "table": "disposal", "source": "證交所 公布處置有價證券、櫃買 處置有價證券",
+                 "note": "處置期間改分盤撮合、可能要預收款券，實際很難照回測價格成交 → 回測預設在處置期間不買進"},
 }
 
 FIELDS: list[Field] = [
@@ -262,7 +264,7 @@ def first_valid(field: Field, share: float = 0.2) -> str | None:
 def catalog() -> dict:
     cov = store.coverage()
     tab = {"prices": "prices", "valuation": "valuation", "insti": "insti", "margin": "margin", "revenue": "revenue",
-           "financials": "income_ytd"}
+           "financials": "income_ytd", "disposal": "disposal"}
     ds = []
     for k, d in DATASETS.items():
         c = cov.get(tab[k], {})

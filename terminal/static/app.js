@@ -64,9 +64,9 @@ const FN_LABEL = { OV: "總覽", GP: "走勢", GIP: "盤中", DES: "概況", N: 
 const KIT_TABS = [["tech", "技術面"], ["options", "選擇權"], ["research", "評等籌碼"], ["earnings", "財報季"], ["value", "價值檢查"], ["intel", "市場情報"]];
 const KIT_WORD = { "技術": "tech", "技術面": "tech", "技術分析": "tech", "選擇權": "options", "期權": "options", "評等": "research", "籌碼": "research", "目標價": "research", "法人": "research", "財報季": "earnings", "EPS": "earnings", "法說": "earnings", "價值": "value", "價值投資": "value", "情報": "intel", "類股輪動": "intel", "市場情報": "intel", "工具箱": "tech" };
 const MON_FNS = ["WEI", "TW", "TWETF", "FX", "CMDTY", "CRYPTO", "RATES", "MAG7"];
-const MON_TITLE = { SECTOR: "產業分布", TWFX: "台幣匯率", MACRO: "美國總經（FRED）", TWMACRO: "台灣總經", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
+const MON_TITLE = { TRACK: "策略追蹤", SECTOR: "產業分布", TWFX: "台幣匯率", MACRO: "美國總經（FRED）", TWMACRO: "台灣總經", LEDGER: "分析紀錄與檢討", EVENTS: "重大事件", FOCUS: "今日焦點", SC: "供應鏈地圖", HOLD: "我的持股", WEI: "全球指數", TW: "台股焦點", TWETF: "熱門 ETF", FX: "外匯", CMDTY: "商品", CRYPTO: "加密貨幣", RATES: "利率／債券", MAG7: "美股科技", W: "自選清單", HELP: "說明", ETFM: "台股 ETF 總覽", FUNDS: "基金搜尋", WORLD: "世界事件（God's Eye View）", LAB: "策略研究", DATA: "資料庫目錄" };
 const AI_CMDS = { TA: "tradingagents", HF: "hedgefund", QLIB: "qlib", QL: "qlib", RL: "finrl", FINRL: "finrl", FG: "fingpt", FINGPT: "fingpt", TFM: "timesfm", TIMESFM: "timesfm", KR: "kronos", KRONOS: "kronos", LY: "laya", ASK: "ask", SET: "settings", DCA: "dca" };
-const ZH_CMD = { "產業": "SECTOR", "產業分布": "SECTOR", "類股": "SECTOR", "美股產業": "SECTOR", "台股產業": "SECTOR", "台灣總經": "TWMACRO", "台經": "TWMACRO", "國內總經": "TWMACRO", "景氣燈號": "TWMACRO", "燈號": "TWMACRO", "景氣": "TWMACRO", "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
+const ZH_CMD = { "追蹤": "TRACK", "策略追蹤": "TRACK", "模擬追蹤": "TRACK", "產業": "SECTOR", "產業分布": "SECTOR", "類股": "SECTOR", "美股產業": "SECTOR", "台股產業": "SECTOR", "台灣總經": "TWMACRO", "台經": "TWMACRO", "國內總經": "TWMACRO", "景氣燈號": "TWMACRO", "燈號": "TWMACRO", "景氣": "TWMACRO", "總經": "MACRO", "經濟": "MACRO", "美國總經": "MACRO", "FRED": "MACRO", "紀錄": "LEDGER", "分析紀錄": "LEDGER", "歷史紀錄": "LEDGER", "檢討": "LEDGER", "準確度": "LEDGER", "大事": "EVENTS", "重大事件": "EVENTS", "大事記": "EVENTS", "焦點": "FOCUS", "今日焦點": "FOCUS", "每日焦點": "FOCUS", "盤後": "FOCUS", "供應鏈": "SC", "產業鏈": "SC", "產業地圖": "SC", "供應鏈地圖": "SC",
   "持股": "HOLD", "我的持股": "HOLD", "庫存": "HOLD", "登入": "HOLD", "走勢": "GP", "K線": "GP", "線圖": "GP", "盤中": "GIP", "概況": "DES", "資料": "DES", "新聞": "N", "財報": "FA",
   "自選": "W", "台股": "TW", "全球": "WEI", "世界": "WORLD", "事件": "WORLD", "上帝視角": "WORLD", "地緣": "WORLD", "指數": "WEI", "美股": "MAG7", "外匯": "FX", "匯率": "TWFX", "台幣": "TWFX", "台幣匯率": "TWFX", "換匯": "TWFX", "商品": "CMDTY", "原物料": "CMDTY",
   "利率": "RATES", "加密": "CRYPTO", "說明": "HELP", "幫助": "HELP", "研究": "LAB", "策略": "LAB", "回測": "LAB", "選股": "LAB", "策略研究": "LAB", "資料庫": "DATA", "目錄": "DATA", "基金": "FUND", "熱門ETF": "TWETF", "ETF排行": "ETF",
@@ -159,10 +159,10 @@ async function boot() {
 function savePanes() {
   if (S.clean) {
     const p = S.panes[0];
-    try { localStorage.setItem("ft.pane0c", JSON.stringify({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, secMkt: p.secMkt, twmId: p.twmId, fredId: p.fredId, fxSel: p.fxSel, kit: p.kit })); } catch (e) {}
+    try { localStorage.setItem("ft.pane0c", JSON.stringify({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, secMkt: p.secMkt, twmId: p.twmId, fredId: p.fredId, fxSel: p.fxSel, kit: p.kit, trk: p.trk })); } catch (e) {}
     return;
   }
-  try { localStorage.setItem("ft.panes", JSON.stringify(S.panes.map((p) => ({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, cmp: p.cmp, fxSel: p.fxSel })))); } catch (e) {}
+  try { localStorage.setItem("ft.panes", JSON.stringify(S.panes.map((p) => ({ sec: p.sec, fn: p.fn, q: p.q, net: p.net, node: p.node, hl: p.hl, cmp: p.cmp, fxSel: p.fxSel, trk: p.trk })))); } catch (e) {}
 }
 
 /* ------------------------------------------------------------ header */
@@ -175,7 +175,7 @@ function buildFkeys() {
   const keys = [
     ["HELP", "說明"], ["FOCUS", "焦點"], ["EVENTS", "大事"], ["LEDGER", "紀錄"], ["MACRO", "總經"], ["TWMACRO", "台經"], ["SECTOR", "產業"], ["SC", "供應鏈"], ["HOLD", "持股"], ["W", "自選"], ["TW", "台股"], ["ETF", "ETF"], ["FUND", "基金"], ["WORLD", "世界"], ["WEI", "全球"], ["MAG7", "美股"], ["TWFX", "台幣"], ["FX", "外匯"],
     ["CMDTY", "商品"], ["RATES", "利率"], ["CRYPTO", "加密"], "|", ["GP", "走勢"], ["GIP", "盤中"], ["DES", "概況"], ["N", "新聞"], ["FA", "財報"], "|",
-    ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["KR", "K線預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
+    ["TA", "多代理人", 1], ["HF", "投資大師", 1], ["QLIB", "量化選股", 1], ["RL", "強化學習", 1], ["FG", "FinGPT", 1], ["TFM", "趨勢預測", 1], ["KR", "K線預測", 1], ["LAYA", "Laya 判斷", 1], ["LAB", "策略研究", 1], ["TRACK", "策略追蹤", 1], ["DATA", "資料庫", 1], ["ASK", "問 AI", 1], ["SET", "設定", 1],
   ];
   const nav = $("#fkeys");
   for (const k of keys) {
@@ -285,6 +285,7 @@ async function run(raw) {
     return setPane(target, { fn: "SC", net, node: hit.node, hl: hit.symbol || "" });
   }
   if (head === "DATA") return setPane(target, { fn: "DATA" });
+  if (head === "TRACK") return setPane(target, { fn: "TRACK", trk: "" });
   if (head === "LAB") { if (LAB[target]) LAB[target].aiRan = false; return setPane(target, { fn: "LAB", q: tail.join(" ") }); }
   if (head === "FUND") {  // 「基金」alone reopens the last search instead of a blank box
     let q = tail.join(" ");
@@ -405,7 +406,7 @@ function renderPane(i) {
     const ai = $("#askIn");  // the AI panel follows the page (unless you are typing)
     if (S.sideTab === "ask" && ai && !ai.value && S.askSec !== (usesSec ? p.sec : "")) renderSide();
   }
-  const R = { OV: renderOV, SECTOR: renderSector, KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
+  const R = { OV: renderOV, TRACK: renderTrack, SECTOR: renderSector, KIT: renderKit, TWFX: renderTWFX, MACRO: renderMacro, TWMACRO: renderTWMacro, LEDGER: renderLedger, EVENTS: renderEvents, FOCUS: renderFocus, SC: renderSC, HOLD: renderHold, GP: renderGP, GIP: renderGP, DES: renderDES, N: renderN, FA: renderFA, ETF: renderETF, W: renderW, HELP: renderHelp,
               ETFM: renderETFMon, FUNDS: renderFundSearch, FUNDD: renderFund, WORLD: renderWorld, LAYA: renderLaya, LAB: renderLab, DATA: renderData };
   if (R[p.fn]) R[p.fn](i, body, p);
   else if (MON_FNS.includes(p.fn)) renderMon(i, body, p);
@@ -534,7 +535,7 @@ async function renderLab(i, body, p) {
   if (!st.spec) st.spec = { ...JSON.parse(JSON.stringify(cat.defaults)), ...cat.presets[0] };
   if (p.q && !st.aiRan) { st.ai = p.q; st.aiRan = true; S.panes[i].q = ""; savePanes(); setTimeout(() => labAI(i), 0); }
   const tabs = h("div", { class: "ranges lab-tabs" });
-  const T = [["spec", "① 策略"], ["report", "② 績效報告"], ["picks", "③ 選股名單"], ["trades", "④ 交易明細"]];
+  const T = [["spec", "① 策略"], ["report", "② 績效報告"], ["valid", "③ 可信度檢查"], ["picks", "④ 選股名單"], ["trades", "⑤ 交易明細"]];
   T.forEach(([k, l]) => tabs.append(h("button", { class: st.tab === k ? "on" : "", disabled: k !== "spec" && !st.res ? true : null,
     onclick: () => { st.tab = k; renderPane(i); } }, l)));
   tabs.append(h("span", { class: "grow" }));
@@ -545,6 +546,7 @@ async function renderLab(i, body, p) {
   if (st.err) box.append(h("div", { class: "errbox" }, st.err));
   if (st.tab === "spec") labSpec(i, box, st, cat);
   else if (st.tab === "report") labReport(i, box, st);
+  else if (st.tab === "valid") labValidate(i, box, st);
   else if (st.tab === "picks") labPicks(i, box, st);
   else labTrades(i, box, st);
 }
@@ -598,6 +600,7 @@ function labSpec(i, box, st, cat) {
   uSel.addEventListener("change", () => { u.market = uSel.value; saveSpec(st); });
   const uMin = h("input", { type: "number", value: u.min_value ?? 20 }); uMin.addEventListener("change", () => { u.min_value = +uMin.value; saveSpec(st); });
   const uFin = h("input", { type: "checkbox", checked: u.exclude_finance ? true : null }); uFin.addEventListener("change", () => { u.exclude_finance = uFin.checked; saveSpec(st); });
+  const uDis = h("input", { type: "checkbox", checked: u.exclude_disposal !== false ? true : null }); uDis.addEventListener("change", () => { u.exclude_disposal = uDis.checked; saveSpec(st); });
   const start = h("input", { type: "date", value: s.start || "2016-01-01" }); start.addEventListener("change", () => { s.start = start.value; saveSpec(st); });
   ed.append(h("div", { class: "lab-grid" },
     h("label", { class: "wide" }, "排名", rank),
@@ -613,6 +616,7 @@ function labSpec(i, box, st, cat) {
     h("label", {}, "市場", uSel),
     h("label", {}, "20 日均成交 ≥（百萬）", uMin),
     h("label", { class: "chk" }, uFin, "排除金融股"),
+    h("label", { class: "chk", title: "處置期間改分盤撮合、可能要預收款券，實際很難照回測價格買到" }, uDis, "排除處置股"),
     h("label", {}, "基準", sel("benchmark", [["0050", "0050 元大台灣50"], ["006208", "006208 富邦台50"], ["0056", "0056 高股息"]]))));
   ed.append(h("div", { class: "run-row" },
     h("button", { class: "btn", disabled: st.busy ? true : null, onclick: () => labRun(i, "backtest") }, "▶ 回測"),
@@ -670,15 +674,21 @@ async function labJob(i) {
   } catch (e) { st.err = e.message; renderPane(i); }
 }
 
-function metricCard(label, v, sub, good) {
-  return h("div", { class: "mcard" }, h("small", {}, label), h("b", { class: good == null ? "" : good ? "up" : "down" }, v), sub ? h("span", {}, sub) : null);
+function metricCard(label, v, sub, good, semantic) {
+  // semantic=true: good/bad (green/red regardless of 紅漲綠跌); otherwise up/down market colours
+  const c = good == null ? "" : semantic ? (good ? "ok" : "bad") : good ? "up" : "down";
+  return h("div", { class: "mcard" }, h("small", {}, label), h("b", { class: c }, v), sub ? h("span", {}, sub) : null);
 }
 
 function labReport(i, box, st) {
   const r = st.res; if (!r || !r.metrics) { box.append(h("div", { class: "empty" }, "還沒有回測結果")); return; }
   const m = r.metrics, s = r.spec;
   if (st.expl) box.append(h("div", { class: "lab-expl", style: "margin-bottom:6px" }, "AI 轉換說明：" + st.expl));
-  box.append(h("div", { class: "lab-title" }, h("b", {}, s.name), h("span", {}, ` ${m.start} ～ ${m.end} · ${CATALOG.rebalance[s.rebalance]} · 前 ${s.top_n} 檔 · 基準 ${s.benchmark}${r.ms != null ? ` · ${(r.ms / 1000).toFixed(1)} 秒` : ""}`)));
+  box.append(h("div", { class: "lab-title" }, h("b", {}, s.name), h("span", {}, ` ${m.start} ～ ${m.end} · ${CATALOG.rebalance[s.rebalance]} · 前 ${s.top_n} 檔 · 基準 ${s.benchmark}${r.ms != null ? ` · ${(r.ms / 1000).toFixed(1)} 秒` : ""}`),
+    h("span", { class: "grow" }),
+    h("button", { class: "btn ghost", title: "回測好看不代表上線會一樣：檢查是不是運氣、是不是參數調太細", onclick: () => { st.tab = "valid"; renderPane(i); if (!st.val) labValidateRun(i); } }, "可信度檢查"),
+    h("button", { class: "btn ghost", title: "從今天開始每天用最新資料算一次這個策略會買賣什麼（不花真錢），和回測預期比較；記錄寫進 Obsidian", onclick: () => trackStart(i, s) }, "📡 開始模擬追蹤")));
+  if (r.disposal) box.append(h("div", { class: "hint", style: "margin:2px 0 6px" }, r.disposal));
   box.append(h("div", { class: "mcards" },
     metricCard("年化報酬", fmtp(m.cagr), `基準 ${fmtp(m.bench_cagr)}`, m.cagr > (m.bench_cagr ?? 0)),
     metricCard("最大回撤", fmtp(m.mdd), `基準 ${fmtp(m.bench_mdd)}`, m.mdd > (m.bench_mdd ?? -100)),
@@ -3806,7 +3816,7 @@ const NAV = [
   ["總經", [["TWMACRO", "台灣總經"], ["MACRO", "美國總經"], ["TWFX", "台幣匯率"], ["FX", "外匯"], ["RATES", "利率"], ["CMDTY", "商品"], ["CRYPTO", "加密貨幣"]]],
   ["事件", [["EVENTS", "重大事件"], ["SC", "供應鏈"], ["WORLD", "世界事件"]]],
   ["我的", [["HOLD", "持股"], ["DCA", "定期定額"], ["LEDGER", "分析紀錄"]]],
-  ["研究", [["LAB", "策略研究"], ["DATA", "資料庫"]]],
+  ["研究", [["LAB", "策略研究"], ["TRACK", "策略追蹤"], ["DATA", "資料庫"]]],
 ];
 const NAV_FN = { ETF: "ETFM", FUND: "FUNDS" };
 const NAV_ICON = {
@@ -4086,5 +4096,189 @@ async function renderOV(i, body, p) {
   }).catch(() => { newsBox.innerHTML = ""; });
 }
 
+
+
+/* ---------- 策略研究：可信度檢查（隨機選股檢定、樣本內外、參數掃描、樣本外前進） */
+async function labValidateRun(i, params) {
+  const st = labState(i);
+  st.busy = params ? "參數掃描中…（每格都要重新選股，約 10–60 秒）" : "可信度檢查中…"; st.err = ""; renderPane(i);
+  try {
+    st.val = await api("/api/research/validate", { method: "POST", json: { spec: st.spec, params: params || "auto" } });
+    st.valHash = JSON.stringify(st.spec);
+  } catch (e) { st.err = e.message; }
+  st.busy = ""; if (st.tab === "valid") renderPane(i);
+}
+
+function histSvg(hist, mark) {
+  const W = 320, H = 90, n = hist.counts.length, mx = Math.max(1, ...hist.counts);
+  const x0 = hist.edges[0], x1 = hist.edges[hist.edges.length - 1], X = (v) => ((v - x0) / (x1 - x0)) * W;
+  const bars = hist.counts.map((c, k) => `<rect x="${(k / n) * W + 1}" y="${H - 14 - (c / mx) * (H - 22)}" width="${W / n - 2}" height="${(c / mx) * (H - 22)}" fill="var(--dim)" opacity=".55"/>`).join("");
+  const mk = mark == null ? "" : `<line x1="${X(mark)}" x2="${X(mark)}" y1="4" y2="${H - 14}" stroke="var(--amber)" stroke-width="2"/><text x="${Math.min(W - 4, X(mark) + 4)}" y="12" fill="var(--amber)" font-size="10" text-anchor="${X(mark) > W - 60 ? "end" : "start"}">策略 ${mark.toFixed(2)}</text>`;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" height="${H}">${bars}${mk}<text x="0" y="${H - 2}" fill="var(--dim)" font-size="10">${x0.toFixed(1)}</text><text x="${W}" y="${H - 2}" fill="var(--dim)" font-size="10" text-anchor="end">${x1.toFixed(1)}　隨機選股的夏普值分布</text></svg>`;
+}
+
+function labValidate(i, box, st) {
+  const v = st.val;
+  const stale = v && st.valHash !== JSON.stringify(st.spec);
+  box.append(h("div", { class: "lab-title" }, h("b", {}, "可信度檢查"),
+    h("span", {}, " 回測漂亮，是選股真的有用，還是運氣、參數調太細？（參考 Blave Agent 的回測檢查）"), h("span", { class: "grow" }),
+    h("button", { class: "btn", disabled: st.busy ? true : null, onclick: () => labValidateRun(i) }, v ? "重新檢查" : "▶ 開始檢查")));
+  if (!v) { box.append(h("div", { class: "empty" }, st.busy ? st.busy : "按「開始檢查」：隨機選股檢定、樣本內外比較、前兩個參數的掃描與樣本外前進。")); return; }
+  if (stale) box.append(h("div", { class: "hint warn", style: "margin-bottom:6px" }, "策略改過了，下面是改之前的結果，請重新檢查。"));
+  const rt = v.random, rs = rt.strategy, rr = rt.random;
+  box.append(h("ul", { class: "val-verdict" }, ...v.verdict.map((x) => h("li", { class: x.startsWith("✓") ? "ok" : x.startsWith("✗") ? "bad" : "" }, x))));
+  box.append(h("div", { class: "mcards" },
+    metricCard("p 值（隨機選股）", rt.p_value.toFixed(3), `${rt.n} 組隨機 · 要 ≤ 0.05`, rt.p_value <= 0.05, true),
+    metricCard("策略年化（快速模擬）", fmtp(rs.cagr), `夏普 ${fmtn(rs.sharpe)}`, null),
+    metricCard("隨機選股年化中位數", fmtp(rr.cagr_median), `90%：${fmtp(rr.cagr_p5)}～${fmtp(rr.cagr_p95)}`, null),
+    metricCard("贏過的隨機組合", rr.beat_share + "%", `中位數夏普 ${fmtn(rr.sharpe_median)}`, rr.beat_share >= 95, true),
+    v.split && v.split.in ? metricCard("樣本內 → 樣本外 夏普", `${fmtn(v.split.in.sharpe)} → ${fmtn(v.split.out.sharpe)}`, `${v.split.cut} 切開`, !v.split.faded, true) : null));
+  const cbox = h("div", { class: "lab-chart" });
+  box.append(h("div", { class: "lab-sec" }, "淨值：策略 vs 隨機選股（中位數與 5–95% 範圍）", h("span", { class: "lab-leg" }, h("i", { style: "background:var(--amber)" }), "策略 ", h("i", { style: "background:#8d999f" }), "隨機中位數 ", h("i", { style: "background:#5f6b72" }), "5%／95%")), cbox,
+    h("div", { class: "val-hist", html: histSvg(rt.hist, rs.sharpe) }));
+  requestAnimationFrame(() => {
+    const ch = LightweightCharts.createChart(cbox, { ...chartTheme(), autoSize: true, rightPriceScale: { mode: 1, borderColor: "#1f252c" } });
+    const L = (k, color, w, style) => { const x = ch.addLineSeries({ color, lineWidth: w, lineStyle: style || 0, priceLineVisible: false, lastValueVisible: false, crosshairMarkerVisible: false }); x.setData(rt.curve.filter((p) => p[k] != null).map((p) => ({ time: p.t, value: p[k] }))); };
+    L("p95", "#5f6b72", 1, 2); L("p5", "#5f6b72", 1, 2); L("p50", "#8d999f", 1, 0); L("s", "#ff9960", 2, 0);
+    ch.timeScale().fitContent();
+    S.charts.set(i, { chart: ch });
+  });
+  // parameter scan
+  const ps = v.params || [];
+  const cur = (v.scan && v.scan.params || []).map((p) => p.id);
+  const opt = (sel) => ps.map((p) => h("option", { value: p.id, selected: p.id === sel ? true : null }, p.label));
+  const s1 = h("select", {}, ...opt(cur[0] || (ps[0] || {}).id));
+  const s2 = h("select", {}, h("option", { value: "" }, "（只掃一個）"), ...opt(cur[1] || ""));
+  box.append(h("div", { class: "lab-sec" }, "參數掃描：參數稍微改變，績效還在嗎？"),
+    h("div", { class: "val-scanbar" }, s1, s2, h("button", { class: "btn ghost", disabled: st.busy ? true : null, onclick: () => labValidateRun(i, [s1.value, s2.value].filter(Boolean)) }, "掃描")));
+  const sc = v.scan;
+  if (sc) {
+    const [pa, pb] = sc.params;
+    const rows = pa.values, cols = pb ? pb.values : [null];
+    const all = sc.sharpe.flat().filter((x) => x != null);
+    const mx = Math.max(0.01, ...all.map(Math.abs));
+    const t = h("table", { class: "grid val-heat" });
+    t.innerHTML = `<thead><tr><th>${esc(pa.label.replace(/【.*?】/, "【?】"))}${pb ? ` ＼ ${esc(pb.label.replace(/【.*?】/, "【?】"))}` : ""}</th>${cols.map((c) => `<th>${c == null ? "夏普" : c}</th>`).join("")}</tr></thead>`;
+    const tb = h("tbody");
+    rows.forEach((rv, a) => tb.append(h("tr", {}, h("td", {}, rv), ...cols.map((_, b) => {
+      const x = sc.sharpe[a][b], cg = sc.cagr[a][b];
+      const isCur = sc.current[0] === a && sc.current[1] === b, isBest = sc.best[0] === a && sc.best[1] === b;
+      const al = x == null ? 0 : Math.min(Math.abs(x) / mx, 1);
+      return h("td", { class: (isCur ? "cur " : "") + (isBest ? "best" : ""), title: `夏普 ${fmtn(x)} · 年化 ${fmtp(cg)} · 周圍平均 ${fmtn(sc.neighbour[a][b])}`,
+        style: x == null ? "" : `background:${x >= 0 ? `rgba(var(--up-rgb),${0.1 + al * 0.55})` : `rgba(var(--down-rgb),${0.1 + al * 0.55})`}` },
+        x == null ? "—" : x.toFixed(2), isBest ? " ★" : "");
+    }))));
+    t.append(tb);
+    box.append(h("div", { class: "val-scan" }, t, h("div", { class: "hint" }, "格子是夏普值；框線＝目前參數、★＝掃描範圍內最好的點。好的策略應該是一片顏色相近的區域，而不是只有一格特別亮。")),
+      h("ul", { class: "val-verdict" }, ...sc.notes.map((x) => h("li", { class: x.startsWith("✓") ? "ok" : x.startsWith("✗") ? "bad" : "" }, x))));
+    const wf = sc.walk_forward || {};
+    if (wf.folds && wf.folds.length) {
+      const ft = h("table", { class: "grid" });
+      ft.innerHTML = `<thead><tr><th>年度</th><th>用之前資料挑到的參數</th><th>挑選時的夏普</th><th>那年報酬（樣本外）</th><th>固定目前參數</th></tr></thead><tbody>${
+        wf.folds.map((f) => `<tr><td>${f.year}</td><td>${esc(f.chosen.join("、"))}</td><td>${fmtn(f.train_sharpe)}</td><td class="${cls(f.test_ret)}">${fmtp(f.test_ret)}</td><td class="${cls(f.current_ret)}">${fmtp(f.current_ret)}</td></tr>`).join("")}</tbody>`;
+      box.append(h("div", { class: "lab-sec" }, `樣本外前進（${wf.from} 起，每年只用之前的資料挑參數）`), ft);
+    } else if (wf.note) box.append(h("div", { class: "hint" }, wf.note));
+  }
+  box.append(h("ul", { class: "lab-notes" }, h("li", {}, v.method), v.disposal ? h("li", {}, v.disposal) : null, h("li", {}, `檢查花了 ${v.seconds} 秒。`)));
+}
+
+/* ---------- 策略模擬追蹤 */
+async function trackStart(i, spec) {
+  const name = window.prompt ? window.prompt("追蹤名稱", spec.name || "未命名策略") : spec.name;
+  if (name === null) return;
+  try {
+    const t = await api("/api/research/tracks", { method: "POST", json: { spec, name } });
+    flash(`已開始追蹤「${t.name}」：每天收盤後自動更新，記錄寫進 Obsidian`);
+    setPane(S.clean ? 0 : otherPane(i, "TRACK"), { fn: "TRACK", trk: t.id });
+  } catch (e) { flash("開始追蹤失敗：" + e.message); }
+}
+
+const TRK_CLS = { "符合預期": "", "低於預期": "down", "高於預期": "up", "剛開始": "muted" };
+
+async function renderTrack(i, body, p) {
+  body.innerHTML = `<div class="loading">載入策略追蹤</div>`;
+  if (p.trk) return renderTrackOne(i, body, p);
+  let list;
+  try { list = await api("/api/research/tracks"); } catch (e) { body.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  if (S.panes[i].fn !== "TRACK" || S.panes[i].trk) return;
+  body.innerHTML = "";
+  body.append(h("div", { class: "ranges" }, h("span", { class: "legend", style: "margin-left:0" }, "每天收盤後用最新資料算一次策略會買賣什麼（不花真錢），和回測時的預期、基準比較；到 20／60／120／250 個交易日自動核對。")));
+  if (!list.length) { body.append(h("div", { class: "empty" }, "還沒有追蹤中的策略。到「策略研究」跑完回測，在績效報告按「📡 開始模擬追蹤」。")); return; }
+  const t = h("table", { class: "grid" });
+  t.innerHTML = `<thead><tr><th>策略</th><th>開始</th><th>交易日</th><th>模擬報酬</th><th>回測預期（90%）</th><th>基準</th><th>狀態</th><th>今天</th></tr></thead>`;
+  const tb = h("tbody");
+  for (const x of list) {
+    const l = x.last || {};
+    const act = l.action ? `換股：買 ${l.action.buy.length}、賣 ${l.action.sell.length}` : l.next_rebalance ? `下次換股 ${l.next_rebalance}` : "—";
+    tb.append(h("tr", { class: "click", onclick: () => setPane(i, { fn: "TRACK", trk: x.id }) },
+      h("td", { class: "nm" }, x.name, x.status === "paused" ? h("span", { class: "tag" }, "暫停") : null), h("td", {}, x.t0), h("td", {}, l.days ?? "—"),
+      h("td", { class: cls(l.ret) }, fmtp(l.ret, 2)), h("td", {}, l.days ? `${fmtp(l.expected)}（${fmtp(l.lo)}～${fmtp(l.hi)}）` : "—"),
+      h("td", { class: cls(l.bench_ret) }, fmtp(l.bench_ret, 2)), h("td", { class: TRK_CLS[l.status] || "" }, l.status || "—"), h("td", { class: "nm" }, act)));
+  }
+  t.append(tb);
+  body.append(t);
+}
+
+async function renderTrackOne(i, body, p) {
+  let t;
+  try { t = await api(`/api/research/tracks/${encodeURIComponent(p.trk)}`); } catch (e) { body.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; return; }
+  if (S.panes[i].trk !== p.trk) return;
+  const l = t.last || {}, e = t.expect || {}, s = t.spec;
+  body.innerHTML = "";
+  body.classList.add("lab");
+  const act = async (a) => {
+    if (a === "delete" && !(window.confirm ? window.confirm(`刪除追蹤「${t.name}」？（Obsidian 裡的筆記會留著）`) : true)) return;
+    try { await api(`/api/research/tracks/${encodeURIComponent(t.id)}`, { method: "POST", json: { action: a } }); } catch (err) { flash(err.message); }
+    setPane(i, a === "delete" ? { fn: "TRACK", trk: "" } : { fn: "TRACK", trk: t.id });
+  };
+  body.append(h("div", { class: "ranges" }, h("button", { onclick: () => setPane(i, { fn: "TRACK", trk: "" }) }, "‹ 全部追蹤"), h("span", { class: "grow" }),
+    h("button", { onclick: () => act("refresh") }, "重新計算"), h("button", { onclick: () => act(t.status === "paused" ? "resume" : "pause") }, t.status === "paused" ? "恢復" : "暫停"),
+    h("button", { onclick: () => act("delete") }, "刪除")));
+  const box = h("div", { class: "lab-body" });
+  body.append(box);
+  box.append(h("div", { class: "lab-title" }, h("b", {}, t.name), h("span", {}, ` 從 ${t.t0} 開始 · ${l.days ?? 0} 個交易日 · ${CATALOG && CATALOG.rebalance ? CATALOG.rebalance[s.rebalance] || s.rebalance : s.rebalance} · 前 ${s.top_n} 檔 · 基準 ${s.benchmark}`),
+    h("span", { class: "grow" }), h("span", { class: TRK_CLS[l.status] || "" }, l.status || "")));
+  if (t.error) box.append(h("div", { class: "errbox" }, t.error));
+  box.append(h("div", { class: "mcards" },
+    metricCard("模擬累計報酬", fmtp(l.ret, 2), `基準 ${fmtp(l.bench_ret, 2)}`, l.bench_ret == null ? null : l.ret >= l.bench_ret),
+    metricCard("回測預期（同天數）", fmtp(l.expected, 2), `90%：${fmtp(l.lo)}～${fmtp(l.hi)}`, null),
+    metricCard("最大回撤", fmtp(l.mdd), `回測 ${fmtp(e.mdd)}`, null),
+    metricCard("回測時的年化", fmtp(e.cagr), `夏普 ${fmtn(e.sharpe)} · ${e.from}～${e.to}`, null)));
+  const a = l.action;
+  box.append(h("div", { class: "trk-today" }, a
+    ? h("div", {}, h("b", {}, `今天（${a.date}）是換股日，明天開盤：`),
+      h("div", {}, "買進：", a.buy.map((x) => x.join(" ")).join("、") || "無"), h("div", {}, "賣出：", a.sell.map((x) => x.join(" ")).join("、") || "無"),
+      h("div", { class: "muted" }, "續抱：", a.keep.map((x) => x.join(" ")).join("、") || "無"))
+    : h("div", {}, `持股不變。下次換股約在 ${l.next_rebalance || "—"}。資料到 ${l.date || "—"}。`)));
+  const cbox = h("div", { class: "lab-chart" });
+  box.append(h("div", { class: "lab-sec" }, "模擬淨值 vs 回測預期", h("span", { class: "lab-leg" }, h("i", { style: "background:var(--amber)" }), "模擬 ", h("i", { style: "background:#86a8d6" }), s.benchmark + " ", h("i", { style: "background:#5f6b72" }), "回測預期 90% 範圍")), cbox);
+  requestAnimationFrame(() => {
+    if (!(l.curve || []).length) return;
+    const ch = LightweightCharts.createChart(cbox, { ...chartTheme(), autoSize: true });
+    const L = (k, color, w, style) => { const x = ch.addLineSeries({ color, lineWidth: w, lineStyle: style || 0, priceLineVisible: false, lastValueVisible: k === "v", crosshairMarkerVisible: false }); x.setData(l.curve.filter((q) => q[k] != null).map((q) => ({ time: q.t, value: q[k] }))); };
+    L("hi", "#5f6b72", 1, 2); L("lo", "#5f6b72", 1, 2); L("mid", "#5f6b72", 1, 1); L("b", "#86a8d6", 1); L("v", "#ff9960", 2);
+    ch.timeScale().fitContent();
+    S.charts.set(i, { chart: ch });
+  });
+  const ct = h("table", { class: "grid" });
+  ct.innerHTML = `<thead><tr><th>交易日</th><th>日期</th><th>實際</th><th>回測預期</th><th>90% 範圍</th><th>落點</th><th>基準</th><th>結果</th></tr></thead><tbody>${
+    (l.checks || []).map((c) => c.due_in != null ? `<tr><td>${c.h}</td><td colspan="7" class="muted">還有 ${c.due_in} 個交易日</td></tr>`
+      : `<tr><td>${c.h}</td><td>${c.date}</td><td class="${cls(c.actual)}">${fmtp(c.actual, 2)}</td><td>${fmtp(c.expected, 2)}</td><td>${fmtp(c.lo)}～${fmtp(c.hi)}</td><td>第 ${c.pct} 百分位</td><td class="${cls(c.bench)}">${fmtp(c.bench, 2)}</td><td class="${TRK_CLS[c.verdict] || ""}">${c.verdict}${c.vs_bench ? "、" + c.vs_bench : ""}</td></tr>`).join("")}</tbody>`;
+  box.append(h("div", { class: "lab-sec" }, "到期核對（和分析紀錄一樣，到期自動用實際股價核對）"), ct);
+  const ht = h("table", { class: "grid" });
+  ht.innerHTML = `<thead><tr><th>代號</th><th>名稱</th><th>權重</th><th>收盤</th><th>持有起</th><th>報酬</th></tr></thead><tbody>${
+    (l.holdings || []).map((x) => `<tr><td class="sym">${x.code}</td><td>${esc(x.name)}</td><td>${x.weight ?? "—"}%</td><td>${nf(x.close)}</td><td>${x.since}</td><td class="${cls(x.ret)}">${fmtp(x.ret, 2)}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">還沒有持股（第一次換股會在 ${t.t0} 的隔天開盤）</td></tr>`}</tbody>`;
+  box.append(h("div", { class: "lab-sec" }, "目前持股"), ht);
+  const tr = l.trades || [];
+  if (tr.length) {
+    const tt = h("table", { class: "grid" });
+    tt.innerHTML = `<thead><tr><th>代號</th><th>買進</th><th>賣出</th><th>天數</th><th>報酬</th><th>原因</th></tr></thead><tbody>${
+      [...tr].reverse().map((x) => `<tr><td class="sym">${x.code}</td><td>${x.entry}</td><td>${x.exit}</td><td>${x.days}</td><td class="${cls(x.ret)}">${fmtp(x.ret, 2)}</td><td class="muted">${esc(x.reason)}</td></tr>`).join("")}</tbody>`;
+    box.append(h("div", { class: "lab-sec" }, "已出場"), tt);
+  }
+  box.append(h("ul", { class: "lab-notes" }, h("li", {}, "每個換股日選出的名單會「凍結」，之後資料修正也不改寫，避免事後美化。"),
+    h("li", {}, `Obsidian：${"finance"}/策略追蹤/${t.name}/總覽.md（每天更新）與每次換股一篇。`),
+    h("li", {}, "回測預期＝開始追蹤時那次回測的每日平均報酬與波動推算的範圍；落在範圍下緣以下代表上線表現明顯不如回測。")));
+}
 
 boot();

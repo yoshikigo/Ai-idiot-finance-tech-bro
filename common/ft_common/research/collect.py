@@ -196,6 +196,37 @@ def fetch_daily(dataset: str, market_: str, d: dt.date) -> str:
         return "error"
 
 
+def fetch_disposal(market_: str, y: int, m: int) -> str:
+    """處置股 announced in one month (both markets keep a date-range query)."""
+    key = f"{y}-{m:02d}"
+    a = dt.date(y, m, 1)
+    b = min((a + dt.timedelta(days=32)).replace(day=1) - dt.timedelta(days=1), dt.date.today())
+    _pace("twse" if market_ == "上市" else "tpex")
+    try:
+        rows = sources.get_disposal(market_, a, b)
+        store.upsert("disposal", [(c, s0.isoformat(), e0.isoformat(), market_, why) for c, s0, e0, why in rows])
+        store.log_fetch("disposal", market_, key, "ok" if rows else "nodata", len(rows))
+        return "ok"
+    except sources.NoData as e:
+        store.log_fetch("disposal", market_, key, "nodata", 0, str(e))
+        return "nodata"
+    except Exception as e:  # noqa: BLE001
+        store.log_fetch("disposal", market_, key, "error", 0, f"{type(e).__name__}: {e}")
+        state["last_error"] = f"處置股 {market_} {key}: {e}"
+        return "error"
+
+
+def _disposal_due(st: tuple | None, recent: bool) -> bool:
+    """Recent months (still filling up) twice a day; past months once (errors retried like the rest)."""
+    if st is None:
+        return True
+    status, tries, ts = st
+    age = (dt.datetime.now() - dt.datetime.fromisoformat(ts)).total_seconds() if ts else 1e9
+    if status in ("ok", "nodata"):
+        return recent and age > 12 * 3600
+    return tries < 8 and age > 2 * 3600 * min(tries, 4)
+
+
 def fetch_revenue(market_: str, y: int, m: int) -> str:
     key = f"{y}-{m:02d}"
     _pace("mops")
@@ -271,7 +302,7 @@ def plan(limit: int = 1) -> list[tuple]:
     t = now_tw()
     today = t.date()
     tasks: list[tuple] = []
-    logs = {ds: store.fetch_state(ds) for ds in ("valuation", "insti", "margin", "revenue", "income_ytd", "balance")}
+    logs = {ds: store.fetch_state(ds) for ds in ("valuation", "insti", "margin", "revenue", "income_ytd", "balance", "disposal")}
     # recent daily data (last 7 weekdays; today only once it is normally published)
     for back in range(0, 10):
         d = today - dt.timedelta(days=back)
@@ -297,6 +328,10 @@ def plan(limit: int = 1) -> list[tuple]:
             for mk in MARKETS:
                 if _due(logs[ds].get((mk, f"{y}Q{q}")), True, True, early):
                     tasks.append(("stmt", kind, mk, y, q))
+    for y, m in list(months_back(today, today.replace(day=1) - dt.timedelta(days=1))):  # 處置股: this & last month
+        for mk in MARKETS:
+            if _disposal_due(logs["disposal"].get((mk, f"{y}-{m:02d}")), True):
+                tasks.append(("disposal", mk, y, m))
     if len(tasks) >= limit or not BACKFILL:
         return tasks[:limit]
     # backfill, newest first
@@ -313,6 +348,12 @@ def plan(limit: int = 1) -> list[tuple]:
                     tasks.append(("stmt", kind, mk, y, q))
                     if len(tasks) >= limit:
                         return tasks
+    for y, m in months_back(today.replace(day=1) - dt.timedelta(days=32), START):
+        for mk in MARKETS:
+            if _disposal_due(logs["disposal"].get((mk, f"{y}-{m:02d}")), False):
+                tasks.append(("disposal", mk, y, m))
+                if len(tasks) >= limit:
+                    return tasks
     stop = today - dt.timedelta(days=int(365.25 * DAILY_YEARS))
     d = today - dt.timedelta(days=10)
     while d >= stop:
@@ -333,6 +374,10 @@ def run_task(task: tuple) -> str:
         _, ds, mk, d = task
         state["task"] = f"{ds} {mk} {d}"
         return fetch_daily(ds, mk, d)
+    if kind == "disposal":
+        _, mk, y, m = task
+        state["task"] = f"處置股 {mk} {y}-{m:02d}"
+        return fetch_disposal(mk, y, m)
     if kind == "revenue":
         _, mk, y, m = task
         state["task"] = f"月營收 {mk} {y}-{m:02d}"
@@ -403,7 +448,7 @@ def loop_forever():
             if res == "ok":
                 pending += 1
             # publish soon: monthly/quarterly data right away, daily data at least every 2 minutes
-            if pending and (tasks[0][0] in ("revenue", "stmt") or time.time() - last_bump > 120):
+            if pending and (tasks[0][0] in ("revenue", "stmt", "disposal") or time.time() - last_bump > 120):
                 store.bump_version()
                 last_bump, pending = time.time(), 0
         except Exception as e:  # noqa: BLE001
@@ -484,7 +529,14 @@ def seed_fake(start: dt.date = dt.date(2016, 1, 1)):
     store.upsert("revenue", rev)
     store.upsert("income_ytd", inc)
     store.upsert("balance", bal)
-    for ds in ("valuation", "insti", "margin", "revenue", "income_ytd", "balance"):
+    dis = []
+    for code in [c for c, x in uni.items() if x.get("kind") == "股票"][:: 9]:
+        r = np.random.default_rng(market._seed(code) + 7)
+        for _ in range(2):
+            a = days[int(r.integers(30, len(days) - 15))].date()
+            dis.append((code, a.isoformat(), (a + dt.timedelta(days=13)).isoformat(), "上市" if code[-1] in "12345" else "上櫃", "示範處置"))
+    store.upsert("disposal", dis)
+    for ds in ("valuation", "insti", "margin", "revenue", "income_ytd", "balance", "disposal"):
         store.log_fetch(ds, "示範", "seed", "ok", 1)
     store.bump_version()
     state["task"] = "示範資料就緒"

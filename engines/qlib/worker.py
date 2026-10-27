@@ -228,7 +228,7 @@ def compute(ctx) -> dict:
 
     ctx.step(92, "Ollama 解讀結果")
     commentary = ollama.ask(
-        llm, "You are a quantitative researcher reviewing a Qlib backtest. Explain what the numbers mean "
+        llm, ollama.RULES_EN + "You are a quantitative researcher reviewing a Qlib backtest. Explain what the numbers mean "
              "(IC, ICIR, excess return, drawdown), whether the signal looks robust or overfit, and how to read "
              "today's ranking. Note limitations: survivorship bias (current constituents), yfinance data, "
              "one-year test window. Be concise and use markdown.",

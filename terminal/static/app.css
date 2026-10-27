@@ -988,5 +988,23 @@ body.clean .ask-ctx b { color: var(--text); font-weight: 500; }
   .ov-airow .oa-t { display: none; }
 }
 body.clean :is(.mcard, .data-card, .fx-card, .fx-sec, .lg-card, .tw-card, .dec, .lab-chart, .lab-spec, .lab-preset, .res-chart, .res-table, .dca-chart, .pipe-stage, .fomc-diff, .mlist) { border-radius: 8px; border-color: var(--line); }
-body.clean :is(.tw-card, .mcard) b:not(.up):not(.down) { color: var(--text); }
+body.clean :is(.tw-card, .mcard) b:not(.up):not(.down):not(.ok):not(.bad) { color: var(--text); }
 body.clean .res-table { overflow: auto; }
+
+/* ---------------- 策略研究：可信度檢查、策略追蹤 */
+.val-verdict { margin: 6px 0 10px; padding-left: 18px; line-height: 1.7; }
+.val-verdict li.ok { color: var(--ok); }
+.val-verdict li.bad { color: var(--bad); }
+.val-hist { margin: 6px 0 4px; max-width: 520px; }
+.val-scanbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 4px 0 8px; }
+.val-scanbar select { max-width: 340px; background: var(--panel-2); border: 1px solid var(--line-2); color: var(--text); padding: 3px 6px; }
+.val-scan { overflow-x: auto; }
+table.val-heat { width: auto; }
+table.val-heat td { text-align: center; min-width: 64px; }
+table.val-heat td.cur { outline: 2px solid var(--text); outline-offset: -2px; font-weight: 700; }
+table.val-heat td.best { font-weight: 700; }
+.trk-today { border: 1px solid var(--line-2); padding: 8px 12px; margin: 8px 0 4px; line-height: 1.7; }
+body.clean .trk-today { border-radius: 10px; background: var(--panel-2); }
+.lab-title .grow { flex: 1; }
+.lab-title { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.mcard b.ok { color: var(--ok); } .mcard b.bad { color: var(--bad); }

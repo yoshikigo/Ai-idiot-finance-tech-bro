@@ -58,7 +58,8 @@ def _join(head: str, sections: dict[str, str], keys, cap: int = MAX_ROLE_CHARS) 
     return f"{head}\n\n{body}" if head else body
 
 
-def role_texts(head: str, sections: dict[str, str], analysts, *, world: str = "", lessons: str = "") -> dict[str, str]:
+def role_texts(head: str, sections: dict[str, str], analysts, *, world: str = "", lessons: str = "",
+               rules: str = "") -> dict[str, str]:
     """→ {role: extra text appended to that role's instrument context}."""
     sections = dict(sections or {})
     if world and not sections.get("world"):
@@ -71,7 +72,8 @@ def role_texts(head: str, sections: dict[str, str], analysts, *, world: str = ""
            + lessons) if lessons else ""
     late = _join(head, sections, LATE_SECTIONS)
     out["researcher"] = "\n\n".join(x for x in (late, les) if x)
-    out["manager"] = "\n\n".join(x for x in (_join(head, sections, (*LATE_SECTIONS, *leftover)), les) if x)
+    # the research manager, trader and portfolio manager write the conclusions → they also get the writing rules
+    out["manager"] = "\n\n".join(x for x in (_join(head, sections, (*LATE_SECTIONS, *leftover)), les, rules.strip()) if x)
     out["risk"] = "\n\n".join(x for x in (late, sections.get("world", ""), les) if x)
     return out
 

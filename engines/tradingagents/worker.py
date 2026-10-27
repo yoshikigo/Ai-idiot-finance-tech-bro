@@ -141,7 +141,8 @@ def run(ctx: Ctx) -> dict:
     sections = llm.get("context_sections") or {}
     routed = bool(sections) and os.environ.get("FT_TA_CTX_ROUTE", "1") != "0"
     if routed:  # each role gets only its part (ctx_route.py) instead of everyone re-reading everything
-        texts = ctx_route.role_texts(llm.get("context_head") or "", sections, analysts, world=compact, lessons=lessons)
+        texts = ctx_route.role_texts(llm.get("context_head") or "", sections, analysts, world=compact, lessons=lessons,
+                                     rules=ollama.RULES_EN)
         ctx_route.install(texts)
         ctx.log(f"帶入 FT 市場背景（依角色分送）：{llm.get('context_parts') or ''}；" + ctx_route.summary(texts)
                 + f"（原本每位代理人都讀 {len(ft_ctx) + len(compact) + len(lessons)} 字）")

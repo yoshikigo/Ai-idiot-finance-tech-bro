@@ -136,7 +136,7 @@ def compute(ctx) -> dict:
 
     ctx.step(92, "Ollama 解讀結果")
     commentary = ollama.ask(
-        llm, "You are reviewing a FinRL deep-reinforcement-learning trading backtest. Compare the RL agent with "
+        llm, ollama.RULES_EN + "You are reviewing a FinRL deep-reinforcement-learning trading backtest. Compare the RL agent with "
              "the equal-weight buy-and-hold baseline, interpret the recent actions (positive=buy shares, "
              "negative=sell), and flag the usual RL caveats (few training samples, seed sensitivity, overfitting, "
              "costs). Be concise; markdown.",

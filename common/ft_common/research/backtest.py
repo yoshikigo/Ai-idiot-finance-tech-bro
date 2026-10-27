@@ -22,7 +22,8 @@ DEFAULTS = {
     "conditions": [], "rank": "", "ascending": False, "top_n": 10,
     "rebalance": "M", "max_weight": 0.2, "stop_loss": None, "take_profit": None,
     "start": "2016-01-01", "end": None, "benchmark": "0050",
-    "universe": {"market": "all", "min_value": 20.0, "exclude_finance": False, "include_etf": False, "industries": []},
+    "universe": {"market": "all", "min_value": 20.0, "exclude_finance": False, "include_etf": False, "industries": [],
+                 "exclude_disposal": True},
     "fee_discount": 0.6, "slippage": 0.001,
 }
 REBALANCE = {"D": "每日", "W": "每週", "M": "每月", "Q": "每季", "revenue": "月營收公布後（每月 10 日後）",
@@ -96,7 +97,33 @@ def universe_mask(s: dict, cal: pd.DatetimeIndex, codes: pd.Index) -> pd.DataFra
     if mv > 0:
         val = F._prices("value").reindex(index=cal, columns=codes).rolling(20, min_periods=10).mean()
         mask &= val >= mv
+    if u.get("exclude_disposal", True):
+        mask &= ~disposal_mask(cal, codes)
     return mask
+
+
+def disposal_periods() -> list[tuple[str, str, str]]:
+    from . import store
+    with store.conn() as c:
+        return c.execute("SELECT code, start, end FROM disposal").fetchall()
+
+
+def disposal_mask(cal: pd.DatetimeIndex, codes: pd.Index) -> pd.DataFrame:
+    """True where a stock is under disposition (處置) — from the day before it starts (the announcement is out by
+    then and orders go in at the next open) through its last day."""
+    arr = np.zeros((len(cal), len(codes)), dtype=bool)
+    if not len(cal):
+        return pd.DataFrame(arr, index=cal, columns=codes)
+    col = {c: i for i, c in enumerate(codes)}
+    for code, a, b in disposal_periods():
+        j = col.get(code)
+        if j is None:
+            continue
+        i0 = max(int(cal.searchsorted(pd.Timestamp(a))) - 1, 0)
+        i1 = int(cal.searchsorted(pd.Timestamp(b), side="right"))
+        if i1 > i0:
+            arr[i0:i1, j] = True
+    return pd.DataFrame(arr, index=cal, columns=codes)
 
 
 def rebalance_dates(cal: pd.DatetimeIndex, freq: str, start, end) -> list[pd.Timestamp]:
@@ -163,7 +190,9 @@ def _picks_np(ok, sc, liq, cols, s) -> list[str]:
 
 
 # ---------------------------------------------------------------- simulation
-def simulate(s: dict, cal, rebal, cond, score, codes, end=None):
+def simulate(s: dict, cal, rebal, cond, score, codes, end=None, fixed: dict | None = None):
+    """fixed: {signal date (Timestamp): [codes]} — use these picks instead of re-selecting (forward tracking keeps
+    the list it actually issued that day, even if the data behind it is revised later)."""
     O = F._prices("adj_open").reindex(index=cal, columns=codes)
     C = F._prices("adj").reindex(index=cal, columns=codes)
     O = O.fillna(C)
@@ -253,7 +282,9 @@ def simulate(s: dict, cal, rebal, cond, score, codes, end=None):
         # 4) rebalance signal at today's close → trade tomorrow
         if d in rebal_set and i < last_i:
             blocked = set()
-            sel = _picks_np(condv[i], None if scorev is None else scorev[i], liqv[i], codes, s)
+            sel = fixed[d] if fixed is not None and d in fixed else \
+                _picks_np(condv[i], None if scorev is None else scorev[i], liqv[i], codes, s)
+            sel = [c for c in sel if c in pos]
             picks_hist.append((d, len(sel)))
             w = min(1.0 / len(sel), s["max_weight"]) if sel else 0
             pending = {c: w for c in sel}
@@ -359,7 +390,8 @@ def _no_data_msg(name: str) -> str:
     return msg
 
 
-def run(spec: dict, today_picks: bool = True) -> dict:
+def prepare(spec: dict) -> dict:
+    """Everything a run needs before simulating: normalized spec, calendar, effective start/end, selection panels."""
     s = normalize(spec)
     cal = F.calendar()
     if len(cal) < 60:
@@ -383,6 +415,14 @@ def run(spec: dict, today_picks: bool = True) -> dict:
     rebal = rebalance_dates(cal, s["rebalance"], start, end)
     if len(rebal) < 2:
         raise SpecError("回測期間太短（換股日少於 2 次）")
+    return {"s": s, "cal": cal, "codes": codes, "start": start, "end": end, "warns": warns, "used": used,
+            "mask": mask, "cond": cond, "score": score, "rebal": rebal}
+
+
+def run(spec: dict, today_picks: bool = True) -> dict:
+    P = prepare(spec)
+    s, cal, codes, end, warns, used = P["s"], P["cal"], P["codes"], P["end"], P["warns"], P["used"]
+    cond, score, rebal = P["cond"], P["score"], P["rebal"]
     eq, trades, n_hold, buys_total, picks_hist, final = simulate(s, cal, rebal, cond, score, codes, end)
     bench = benchmark(s["benchmark"], eq.index)
     m = metrics(eq, bench, trades, buys_total)
@@ -413,12 +453,25 @@ def run(spec: dict, today_picks: bool = True) -> dict:
            "holdings": [{"code": c, "name": _name(c)} for c in final],
            "picks_count": [{"t": d.date().isoformat(), "n": n} for d, n in picks_hist],
            "used_fields": used, "data_end": cal[-1].date().isoformat(),
+           "disposal": disposal_note(s),
            "notes": ["股票池只含目前仍上市櫃的公司（已下市股票不在資料內）→ 回測報酬會有存活者偏差、偏樂觀。",
                      "月營收、財報以法定公布期限對齊；日資料在當天收盤後才使用，隔日開盤成交。",
                      "報酬用還原股價計算（含股利再投入）；成本含手續費、證交稅與滑價。"]}
     if today_picks:
         out["picks"] = current_picks(s, cal, codes, cond, score, used)
     return py(out)
+
+
+def disposal_note(s: dict) -> str:
+    if not s["universe"].get("exclude_disposal", True):
+        return "沒有排除處置股（處置期間的股票實際很難照回測價格買到）"
+    try:
+        p = disposal_periods()
+    except Exception:  # noqa: BLE001
+        p = []
+    if not p:
+        return "處置股資料還沒有（背景收集中），這次回測沒有排除處置股"
+    return f"已排除處置期間的股票（處置紀錄 {len(p)} 筆，最早 {min(x[1] for x in p)}）"
 
 
 def current_picks(s, cal, codes, cond, score, used) -> dict:

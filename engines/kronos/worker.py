@@ -218,7 +218,7 @@ def run(ctx: Ctx) -> dict:
     if llm.get("context"):
         facts += "\n\n" + llm["context"]
         ctx.log(f"帶入 FT 市場背景：{llm.get('context_parts') or ''}")
-    commentary = ollama.ask(llm, "You explain candlestick (K-line) foundation-model forecasts to a retail investor. Kronos is "
+    commentary = ollama.ask(llm, ollama.RULES_EN + "You explain candlestick (K-line) foundation-model forecasts to a retail investor. Kronos is "
                                  "pre-trained on OHLCV bars from 45+ exchanges and generates future bars by sampling; it sees only "
                                  "past prices and volume — no news, fundamentals or events. Explain the median path, the spread of "
                                  "the sampled paths (uncertainty), what the backtest says about reliability versus the naive "

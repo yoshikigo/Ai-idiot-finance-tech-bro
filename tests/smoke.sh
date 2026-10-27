@@ -61,6 +61,8 @@ raw=$r; r=$(j "f\"{d['action']['label']} {d['action']['probabilities'][d['action
 r=$(curl -fsS -m 30 $B/api/research/catalog | j "' / '.join(f\"{x['name']} {x['rows']}筆 {x['first'] or '—'}~{x['last'] or '—'}\" for x in d['datasets'])") && ok "研究資料庫：$r" || bad "研究資料庫目錄失敗（journalctl --user -u ft-research -n 50）"
 r=$(curl -fsS -m 30 $B/api/research/catalog | j "str(d['errors'][:3]) if d['errors'] else 'none'") && echo "   最近抓取錯誤：${r:0:300}"
 r=$(curl -fsS -m 600 -XPOST $B/api/research/screen -H 'content-type: application/json' -d '{"spec":{"conditions":["收盤價 > ma(收盤價, 20)"],"rank":"pct(收盤價, 20)","top_n":5}}' | j "', '.join(x['code']+' '+x['name'] for x in d['picks']['rows'])") && ok "條件選股（站上月線、20 日漲幅前 5）：$r" || bad "條件選股失敗：$r"
+r=$(curl -fsS -m 900 -XPOST $B/api/research/validate -H 'content-type: application/json' -d '{"spec":{"conditions":["收盤價 > ma(收盤價, 20)"],"rank":"pct(收盤價, 20)","top_n":5},"params":null}' | j "f\"p={d['random']['p_value']}，策略年化 {d['random']['strategy']['cagr']}%／隨機中位數 {d['random']['random']['cagr_median']}%（{d['random']['n']} 組，{d['seconds']} 秒）；{d['disposal']}\"") && ok "可信度檢查：$r" || bad "可信度檢查失敗：$r"
+n=$(curl -fsS $B/api/research/tracks | j "len(d)") && ok "策略模擬追蹤：$n 個" || bad "策略追蹤 API 失敗"
 
 id=$(curl -fsS -XPOST $B/api/engines/fingpt/jobs -H 'content-type: application/json' \
   -d '{"params":{"mode":"sentiment","ticker":"AAPL","text":"Apple beats revenue estimates and raises dividend\nRegulators open antitrust probe into App Store"}}' | j "d['id']")
