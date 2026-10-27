@@ -6,6 +6,7 @@ import os
 from ft_common import ollama
 from ft_common.engine import Ctx, Engine, serve, split_tickers, today
 
+import ctx_route
 import limits
 import resume
 import world_hook
@@ -108,6 +109,7 @@ def run(ctx: Ctx) -> dict:
     world_info = None
     graph_cls = TradingAgentsGraph
     world_hook.install(use_world)
+    compact = ""
     if use_world:
         ctx.step(8, "讀取現實世界訊號（God's Eye View）")
         from ft_common import world
@@ -117,19 +119,31 @@ def run(ctx: Ctx) -> dict:
             compact = world.compact(regions, as_of)
             world_info = {"regions": regions, "digest": world.digest(regions, as_of),
                           "events": world.events(regions, days=7, as_of=as_of)}
-            graph_cls = world_hook.graph_class(TradingAgentsGraph, compact)
             ctx.log(f"世界訊號區域：{', '.join(regions)}；事件 {len(world_info['events'])} 筆；新聞分析師多了 get_world_events 工具")
         except Exception as e:  # noqa: BLE001
             ctx.log(f"世界訊號無法讀取，略過：{e}")
 
-    ft_ctx = (ctx.llm or {}).get("context") or ""
-    if ft_ctx:  # FT 市場背景: Chinese news, flows, revenue, sector, macro, events — every agent reads it
-        graph_cls = world_hook.graph_class(graph_cls, ft_ctx)
-        ctx.log(f"帶入 FT 市場背景：{(ctx.llm or {}).get('context_parts') or ''}（{len(ft_ctx)} 字）")
-    lessons = (ctx.llm or {}).get("lessons") or ""
-    if lessons:  # 檢討回饋：appended to the instrument context every agent reads
-        graph_cls = world_hook.graph_class(graph_cls, "LESSONS FROM REVIEWING YOUR PAST CALLS AGAINST ACTUAL PRICES "
-                                                      "(FT review system; avoid repeating these mistakes):\n" + lessons)
+    llm = ctx.llm or {}
+    ft_ctx = llm.get("context") or ""
+    lessons = llm.get("lessons") or ""
+    sections = llm.get("context_sections") or {}
+    routed = bool(sections) and os.environ.get("FT_TA_CTX_ROUTE", "1") != "0"
+    if routed:  # each role gets only its part (ctx_route.py) instead of everyone re-reading everything
+        texts = ctx_route.role_texts(llm.get("context_head") or "", sections, analysts, world=compact, lessons=lessons)
+        ctx_route.install(texts)
+        ctx.log(f"帶入 FT 市場背景（依角色分送）：{llm.get('context_parts') or ''}；" + ctx_route.summary(texts)
+                + f"（原本每位代理人都讀 {len(ft_ctx) + len(compact) + len(lessons)} 字）")
+    else:
+        ctx_route.install(None)
+        if compact:
+            graph_cls = world_hook.graph_class(graph_cls, compact)
+        if ft_ctx:  # FT 市場背景: Chinese news, flows, revenue, sector, macro, events — every agent reads it
+            graph_cls = world_hook.graph_class(graph_cls, ft_ctx)
+            ctx.log(f"帶入 FT 市場背景：{llm.get('context_parts') or ''}（{len(ft_ctx)} 字）")
+        if lessons:  # 檢討回饋：appended to the instrument context every agent reads
+            graph_cls = world_hook.graph_class(graph_cls, "LESSONS FROM REVIEWING YOUR PAST CALLS AGAINST ACTUAL PRICES "
+                                                          "(FT review system; avoid repeating these mistakes):\n" + lessons)
+    if lessons:
         ctx.log(f"帶入過去檢討 {sum(1 for x in lessons.splitlines() if x.startswith('- '))} 條（分析紀錄頁可關閉）")
     ctx.step(10, f"多代理人分析 {ticker}（分析師 → 多空辯論 → 交易員 → 風控 → 經理）")
     asset = "crypto" if ticker.endswith("-USD") else "stock"

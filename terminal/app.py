@@ -639,6 +639,8 @@ def enrich_job(name: str, body: dict) -> dict:
             if name in ("tradingagents", "fingpt", "timesfm", "kronos") and syms:
                 b = brief.build(syms[0], date, exclude=ex, engine=name)
                 body["llm"]["context"] = b["text"]
+                if name == "tradingagents" and b.get("sections"):  # routed per agent role (engines/tradingagents/ctx_route.py)
+                    body["llm"].update(context_head=b["head"], context_sections=b["sections"])
             elif syms:
                 b = brief.build_many(syms, date, per_chars=1500 if name in ("qlib", "finrl") else 2500, exclude=ex, engine=name)
                 body["llm"].update(context=b["text"], context_by=b["by_symbol"])

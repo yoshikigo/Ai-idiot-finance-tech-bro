@@ -412,7 +412,7 @@ def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_
         plan.append(("world", lambda: world_section(sym, as_of)))
     if not tw and is_sec and live:
         plan.append(("sec", lambda: sec_section(sym)))
-    texts, parts, skipped = [], [], {}
+    texts, parts, skipped, sections = [], [], {}, {}
     for key, fn in plan:
         if key in exclude:
             continue
@@ -424,6 +424,7 @@ def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_
         if t:
             texts.append(t.strip())
             parts.append(key)
+            sections[key] = t.strip()
         else:
             skipped[key] = "沒有資料"
     if not live:
@@ -433,7 +434,8 @@ def build(sym: str, as_of: str | None = None, *, market_parts: bool = True, max_
     body = "\n\n".join(texts)
     if len(body) > max_chars:
         body = body[:max_chars].rsplit("\n", 1)[0] + "\n…（已截斷）"
-    return {"text": (head + "\n\n" + body) if texts else "", "parts": parts, "skipped": skipped, "as_of": as_of or _today()}
+    return {"text": (head + "\n\n" + body) if texts else "", "parts": parts, "skipped": skipped, "as_of": as_of or _today(),
+            "head": head, "sections": sections}
 
 
 def build_many(syms: list[str], as_of: str | None = None, per_chars: int = 2500, exclude: set | frozenset = frozenset(),

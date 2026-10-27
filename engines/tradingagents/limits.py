@@ -173,8 +173,9 @@ class NodeTracker(BaseCallbackHandler):
         out = usage.get("completion_tokens") or um.get("output_tokens")
         inp = usage.get("prompt_tokens") or um.get("input_tokens")
         cut = finish == "length"
-        s = self.stats.setdefault(self.label, {"calls": 0, "out": 0, "sec": 0.0, "cut": 0})
+        s = self.stats.setdefault(self.label, {"calls": 0, "out": 0, "sec": 0.0, "cut": 0, "inp": 0})
         s["calls"] += 1
+        s["inp"] = s.get("inp", 0) + int(inp or 0)
         s["out"] += int(out or 0)
         s["sec"] += sec
         s["cut"] += int(cut)
@@ -251,7 +252,11 @@ def install(caps: dict[str, int], log: Callable[[str], None], stats: dict, *, ti
 def summary(stats: dict) -> str:
     if not stats:
         return ""
-    rows = ["| 節點 | 呼叫 | 輸出 tokens | 秒 | 被截斷 |", "|---|---:|---:|---:|---:|"]
+    rows = ["| 節點 | 呼叫 | 輸入 tokens | 輸出 tokens | 秒 | 被截斷 |", "|---|---:|---:|---:|---:|---:|"]
     for k, s in stats.items():
-        rows.append(f"| {k} | {s['calls']} | {s['out']:,} | {s['sec']:.0f} | {s['cut'] or ''} |")
+        rows.append(f"| {k} | {s['calls']} | {s.get('inp', 0):,} | {s['out']:,} | {s['sec']:.0f} | {s['cut'] or ''} |")
+    tot_in = sum(s.get("inp", 0) for s in stats.values())
+    tot_out = sum(s["out"] for s in stats.values())
+    rows.append(f"| **合計** | {sum(s['calls'] for s in stats.values())} | {tot_in:,} | {tot_out:,} | "
+                f"{sum(s['sec'] for s in stats.values()):.0f} | |")
     return "\n".join(rows)
