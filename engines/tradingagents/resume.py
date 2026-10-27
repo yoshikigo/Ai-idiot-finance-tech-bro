@@ -63,16 +63,24 @@ class Store:
             pass
 
 
-def install(store: Store, reuse: dict[str, dict], log: Callable[[str], None], pipe=None, job_id: str = ""):
+def install(store: Store, reuse: dict[str, dict], log: Callable[[str], None], pipe=None, job_id: str = "",
+            on_report: Callable[[str, str, str, str], None] | None = None):
     """Wrap the analyst factories in tradingagents.graph.setup (call after limits.install):
-    analysts with a saved report answer with it at once; the others save their report when they write it."""
+    analysts with a saved report answer with it at once; the others save their report when they write it.
+    on_report(key, label, report, reused_note) fires for every analyst report of this run (Obsidian notes)."""
+    def emit(key, label, report, note=""):
+        if on_report:
+            try:
+                on_report(key, label, report, note)
+            except Exception as e:  # noqa: BLE001  a note must never break the analysis
+                log(f"Obsidian 分析師筆記失敗（{label}）：{e}")
     import tradingagents.graph.setup as setup
     from langchain_core.messages import AIMessage
 
     for name, (key, state_key, label) in ANALYSTS.items():
         inner = getattr(setup, name)
 
-        def make(inner=inner, key=key, state_key=state_key, label=label):
+        def make(inner=inner, key=key, state_key=state_key, label=label, name=name):
             def factory(llm, *a, **k):
                 saved = reuse.get(key)
                 if saved:
@@ -83,6 +91,7 @@ def install(store: Store, reuse: dict[str, dict], log: Callable[[str], None], pi
                         log(f"↺ {label}：沿用 {when} 的報告（{len(report)} 字），不再呼叫模型")
                         if pipe:
                             pipe.reused(label, f"沿用 {when}")
+                        emit(key, label, report, f"沿用 {when} 的報告（上次失敗前已完成）")
                         return {"messages": [AIMessage(content=report)], state_key: report}
                     return reused_node
 
@@ -93,6 +102,7 @@ def install(store: Store, reuse: dict[str, dict], log: Callable[[str], None], pi
                     rep = (out or {}).get(state_key) if isinstance(out, dict) else None
                     if rep:
                         store.save(key, rep, job_id)
+                        emit(key, label, rep)
                     return out
                 return saving_node
             factory.__name__ = getattr(inner, "__name__", name)

@@ -209,6 +209,56 @@ def write_job_note(job: dict, force: bool = False) -> str | None:
     return rel
 
 
+TA_DIR = os.environ.get("FT_TA_OBSIDIAN_DIR", "trading-agent").strip("/") or "trading-agent"
+
+
+def ta_run_folder(job_id: str, ticker: str, when: dt.datetime | None = None) -> str:
+    """trading-agent/<分析時間> <代號> <名稱> — one folder per TradingAgents run (vault-relative)."""
+    m = re.match(r"(\d{8})-(\d{4})", job_id or "")
+    t = when or (dt.datetime.strptime("".join(m.groups()), "%Y%m%d%H%M") if m else dt.datetime.now())
+    nm = _name(ticker) if ticker else ""
+    return f"{TA_DIR}/{safe_name(f'{t:%Y-%m-%d %H.%M} {ticker or ''} {nm}', 80)}"
+
+
+def write_ta_analyst(folder: str, label: str, report: str, meta: dict) -> str | None:
+    """One TradingAgents analyst's report → <folder>/<分析師>.md, written the moment it is done."""
+    if not enabled("tradingagents") or not (report or "").strip():
+        return None
+    fm = {"type": "ta-analyst", "analyst": label, "ticker": meta.get("ticker"), "name": meta.get("name"),
+          "date": meta.get("date"), "run": meta.get("run"), "job_id": meta.get("job_id"), "model": meta.get("model"),
+          "reused": meta.get("reused") or None, "source": "FT 金融終端",
+          "tags": ["finance", "tradingagents", f"analyst/{safe_name(label, 20)}",
+                   f"ticker/{safe_name(str(meta.get('ticker') or '').split('.')[0], 20) or 'none'}"]}
+    head = f"# {label}｜{meta.get('ticker') or ''} {meta.get('name') or ''}".rstrip()
+    sub = f"分析日 {meta.get('date')}・執行 {meta.get('run')}" + (f"・{meta['reused']}" if meta.get("reused") else "")
+    rel = f"{folder}/{safe_name(label)}.md"
+    _write_outbox(rel, "\n".join([frontmatter(fm), head, "", f"> {sub}", "", report.strip(), "",
+                                  "_AI 產生的研究筆記，不構成投資建議。_", ""]))
+    return rel
+
+
+def write_ta_summary(folder: str, meta: dict, labels: list[str], sections: list[tuple[str, str]]) -> str | None:
+    """<folder>/00 總覽.md: the final decision and links to each analyst note of the run."""
+    if not enabled("tradingagents"):
+        return None
+    fm = {"type": "ta-run", "ticker": meta.get("ticker"), "name": meta.get("name"), "date": meta.get("date"),
+          "run": meta.get("run"), "signal": meta.get("signal"), "status": meta.get("status"), "job_id": meta.get("job_id"),
+          "model": meta.get("model"), "source": "FT 金融終端", "tags": ["finance", "tradingagents", "ta-run"]}
+    body = [frontmatter(fm), f"# {meta.get('ticker') or ''} {meta.get('name') or ''}｜TradingAgents {meta.get('run')}".strip(), ""]
+    if meta.get("signal"):
+        body += [f"> **評等**：{meta['signal']}", ""]
+    if meta.get("error"):
+        body += [f"> [!warning] 這次沒有跑完：{meta['error']}", "> 下面是失敗前已完成的分析師；重跑時會沿用。", ""]
+    body += ["## 分析師", ""] + [f"- [[{folder}/{safe_name(lb)}|{lb}]]" for lb in labels] + [""]
+    for title, text in sections:
+        if text:
+            body += [f"## {title}", "", text.strip(), ""]
+    body += ["_AI 產生的研究筆記，不構成投資建議。_", ""]
+    rel = f"{folder}/00 總覽.md"
+    _write_outbox(rel, "\n".join(body))
+    return rel
+
+
 def ensure_index():
     st = _state()
     if st.get("index_written"):

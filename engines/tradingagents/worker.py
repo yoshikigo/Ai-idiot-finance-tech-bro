@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from ft_common import ollama
+from ft_common import notes, ollama
 from ft_common.engine import Ctx, Engine, serve, split_tickers, today
 
 import ctx_route
@@ -93,7 +93,19 @@ def run(ctx: Ctx) -> dict:
                          hours=float(os.environ.get("FT_TA_RESUME_HOURS", "12")))
     use_resume = p.get("resume", True) not in (False, "false", "0", 0)
     reuse = {k: v for k, v in store.load().items() if k in analysts} if use_resume else {}
-    resume.install(store, reuse, ctx.log, pipe, job_id=str(getattr(ctx.job, "id", "")))
+    # Obsidian：每位分析師一寫完就存一篇 trading-agent/<分析時間> <標的>/<分析師>.md
+    job_id = str(getattr(ctx.job, "id", ""))
+    ob_folder = notes.ta_run_folder(job_id, ticker)
+    ob_meta = {"ticker": ticker, "name": notes._name(ticker), "date": date, "job_id": job_id,  # noqa: SLF001
+               "run": ob_folder.rsplit("/", 1)[1][:16].replace(".", ":"), "model": quick.get("model")}
+    ob_labels: list[str] = []
+
+    def on_report(key, label, report, reused_note):
+        if notes.write_ta_analyst(ob_folder, label, report, {**ob_meta, "reused": reused_note}):
+            if label not in ob_labels:
+                ob_labels.append(label)
+            ctx.log(f"📝 Obsidian：{ob_folder}/{label}.md")
+    resume.install(store, reuse, ctx.log, pipe, job_id=job_id, on_report=on_report)
     if reuse:
         names = [lab for _, (k, _, lab) in resume.ANALYSTS.items() if k in reuse]
         ctx.log(f"↺ 沿用上次失敗前已完成的報告：{'、'.join(names)}；只重跑其餘分析師")
@@ -151,8 +163,13 @@ def run(ctx: Ctx) -> dict:
         with ctx.capture():
             ta = graph_cls(selected_analysts=tuple(analysts), debug=True, config=cfg)
             state, rating = ta.propagate(ticker, date, asset_type=asset)
-    except BaseException:
+    except BaseException as e:
         pipe.finish(False)
+        if ob_labels:  # keep what the finished analysts wrote, with a note that the run stopped
+            try:
+                notes.write_ta_summary(ob_folder, {**ob_meta, "status": "error", "error": f"{type(e).__name__}: {e}"[:200]}, ob_labels, [])
+            except Exception:  # noqa: BLE001
+                pass
         raise
     pipe.finish(True)
     store.clear()  # finished: the next run is a new analysis, not a replay
@@ -188,6 +205,14 @@ def run(ctx: Ctx) -> dict:
         md.append("<details><summary>🌐 分析時提供給代理人的現實世界訊號（God's Eye View）</summary>\n\n"
                   + world_info["digest"] + "\n</details>\n")
     decision = state.get("final_trade_decision") or ""
+    try:
+        order = [lab for _, _, lab in resume.ANALYSTS.values()]
+        ob_labels.sort(key=lambda x: order.index(x) if x in order else 99)
+        notes.write_ta_summary(ob_folder, {**ob_meta, "status": "done", "signal": str(rating)}, ob_labels,
+                               [("🧭 投資組合經理｜最終決策", decision), ("💼 交易員｜交易計畫", state.get("trader_investment_plan") or ""),
+                                ("🔬 研究經理｜投資計畫", state.get("investment_plan") or "")])
+    except Exception as e:  # noqa: BLE001
+        ctx.log(f"Obsidian 總覽筆記失敗：{e}")
     return {"summary": f"{ticker} {date} → {rating}", "signal": str(rating),
             "markdown": "\n".join(md), "headline": decision[:400], "world": world_info, "node_stats": stats}
 

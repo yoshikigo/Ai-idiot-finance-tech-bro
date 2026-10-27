@@ -65,3 +65,21 @@ def test_reused_and_saving_nodes_inside_the_real_analyst_subgraph(tmp_path):
     market = setup._analyst_graph(ANALYST_NODE_SPECS["market"], setup.create_market_analyst(None), 3).invoke(state)
     assert market == {"market_report": "技術報告"}
     assert st.load()["market"]["job"] == "new-job"  # saved the moment it was written
+
+
+def test_on_report_fires_for_new_and_reused_reports(tmp_path):
+    import tradingagents.graph.setup as setup
+    from langchain_core.messages import AIMessage, HumanMessage
+    from tradingagents.graph.analyst_execution import ANALYST_NODE_SPECS
+
+    limits.install(limits.DEFAULT_CAPS, lambda m: None, {}, timeout=5)
+    setup.create_market_analyst = lambda llm: (lambda s: {"messages": [AIMessage(content="技術報告")], "market_report": "技術報告"})
+    st = resume.Store(tmp_path, "2330.TW", "2026-10-27", "zh")
+    st.save("news", "舊新聞報告", "old")
+    got = []
+    resume.install(st, st.load(), lambda m: None, None, job_id="j", on_report=lambda *a: got.append(a))
+    state = {"messages": [HumanMessage(content="2330.TW")], "company_of_interest": "2330.TW", "trade_date": "2026-10-27"}
+    setup._analyst_graph(ANALYST_NODE_SPECS["news"], setup.create_news_analyst(None), 3).invoke(state)
+    setup._analyst_graph(ANALYST_NODE_SPECS["market"], setup.create_market_analyst(None), 3).invoke(state)
+    assert got[0][:3] == ("news", "新聞分析師", "舊新聞報告") and "沿用" in got[0][3]
+    assert got[1] == ("market", "技術分析師", "技術報告", "")

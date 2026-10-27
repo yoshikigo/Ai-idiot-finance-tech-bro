@@ -346,6 +346,7 @@ cd fin-terminal
 | `FT_FRED_API_KEY` | 選用；fredgraph.csv 抓不到時改走 FRED 官方 API |
 | `FT_SIGNUP` | `open`（預設，可自行註冊）／`off`（只能由管理者建帳號） |
 | `FT_EVENTS_YEARS`、`FT_EVENTS_AI` | 重大事件背景偵測年數、是否讓 AI 命名 |
+| `FT_TA_OBSIDIAN_DIR` | TradingAgents 每位分析師筆記的 vault 資料夾（預設 `trading-agent`，底下每次分析一個「時間 代號 名稱」資料夾） |
 | `FT_TA_MAX_TOKENS_*`、`FT_TA_TIMEOUT`、`FT_TA_RESUME_HOURS`、`FT_TA_CTX_ROUTE` | TradingAgents 各節點輸出上限與逾時（本機模型容易寫不停）；失敗後沿用已完成分析師報告的有效時間（預設 12 小時）；FT 市場背景依角色分送（預設開，`0` 改回每位代理人都讀全部） |
 | `FT_RESEARCH_START`、`FT_RESEARCH_DAILY_YEARS` | 策略研究資料回補範圍 |
 | `FT_PUBLIC_HOSTS`、`FT_PUBLIC_TOTP`、`FT_PUBLIC_SIGNUP` | 公開網址設定（`--cloudflare` 會自動寫入） |
