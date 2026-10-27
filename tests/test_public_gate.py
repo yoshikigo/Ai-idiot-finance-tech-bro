@@ -38,6 +38,9 @@ def test_public_requires_login(C):
     _, pub = C
     H = {"x-ft": "1"}
     assert pub.get("/").status_code == 200 and pub.get("/static/app.js").status_code == 200
+    # iPad／iPhone「加入主畫面」在登入前就會抓圖示與 manifest
+    for f in ("manifest.webmanifest", "apple-touch-icon.png", "icon-192.png", "icon-512.png"):
+        assert pub.get(f"/static/{f}").status_code == 200
     me = pub.get("/api/auth/me").json()
     assert me["public"] is True and me["signup"] is False
     for path in ("/api/settings", "/api/quotes?s=2330.TW", "/api/events", "/api/macro", "/api/engines"):

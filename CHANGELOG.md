@@ -2,6 +2,11 @@
 
 各版本新增功能的詳細說明（新的在上面）。使用方式請看 [README](README.md)。
 
+## 📱 iPad／iPhone 加入主畫面（2026.10.28-48）
+
+- 加上 web app manifest、`apple-touch-icon`（180／192／512 px，沿用網頁小圖示的橘色走勢線）與 iOS 全螢幕標籤。Safari「分享 → 加入主畫面」後，主畫面圖示與名稱是「FT 終端」，從圖示打開沒有網址列。
+- 圖示與 manifest 放在 `/static/`，公開網址未登入也抓得到。
+
 ## 🧪 策略研究：可信度檢查、處置股、模擬追蹤；AI 寫作規則（2026.10.27-47）
 
 參考 [Blave Agent](https://github.com/Blave-TW/blave-agent)：
