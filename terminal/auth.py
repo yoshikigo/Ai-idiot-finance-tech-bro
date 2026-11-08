@@ -568,6 +568,28 @@ def list_holdings(req: Request, resp: Response):
     return {"user": u["username"], **portfolio(u["id"])}
 
 
+_health_cache: dict = {}
+
+
+@router.get("/api/me/holdings/health")
+def holdings_health(req: Request, resp: Response, years: float = 3.0, max_weight: float = 0.0):
+    """組合體檢（skfolio）：風險貢獻、相關性、各配置方法的權重與樣本外表現。只在本機計算，不經過任何 AI。"""
+    _no_store(resp)
+    u = require_user(req)
+    from ft_common import allocate
+    rows = portfolio(u["id"])["rows"]
+    key = (u["id"], tuple(sorted((r["symbol"], round(r.get("value_twd") or 0, -2)) for r in rows)), years, max_weight)
+    hit = _health_cache.get(u["id"])
+    if hit and hit[0] == key and time.time() - hit[1] < 1800:
+        return hit[2]
+    try:
+        out = allocate.health(rows, years=max(1.0, min(years, 10.0)), max_weight=max_weight or None)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    _health_cache[u["id"]] = (key, time.time(), out)
+    return out
+
+
 @router.post("/api/me/holdings")
 async def add_holding(req: Request):
     _csrf(req)

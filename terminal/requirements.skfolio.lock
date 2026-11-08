@@ -1,0 +1,14 @@
+# 組合配置（持股體檢、定期定額分配、策略研究的 HRP／風險平價權重、組合式交叉驗證）— only in the fin-terminal image
+skfolio==1.12.7
+scikit-learn==1.9.1
+scipy==1.18.1
+cvxpy-base==1.9.3
+clarabel==0.11.1
+qdldl==0.1.9.post1
+sparsediffpy==0.6.1
+cloudpickle==3.1.2
+joblib==1.6.0
+threadpoolctl==3.8.0
+plotly==7.1.0
+narwhals==2.28.0
+packaging==26.3

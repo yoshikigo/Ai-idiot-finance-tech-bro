@@ -2,10 +2,17 @@
 
 各版本新增功能的詳細說明（新的在上面）。使用方式請看 [README](README.md)。
 
-## 📱 iPad／iPhone 加入主畫面（2026.10.28-48）
+## ⚖️ skfolio：組合體檢、定期定額分配、策略權重、PBO（2026.11.08-48）
 
-- 加上 web app manifest、`apple-touch-icon`（180／192／512 px，沿用網頁小圖示的橘色走勢線）與 iOS 全螢幕標籤。Safari「分享 → 加入主畫面」後，主畫面圖示與名稱是「FT 終端」，從圖示打開沒有網址列。
-- 圖示與 manifest 放在 `/static/`，公開網址未登入也抓得到。
+加入 [skfolio](https://github.com/skfolio/skfolio)（BSD-3，1.12.7）。只用不需要預測報酬的方法（等權重、反波動率、風險平價、HRP、最小 CVaR），避免均值–變異數的權重被估計誤差帶著跑。
+- **我的持股 → 組合體檢**（`GET /api/me/holdings/health`，要登入；只在本機計算，不經過任何 AI、不寫 Obsidian、agent API 拿不到）：資金比重 vs 風險貢獻、相關係數、各方法的建議權重，以及每季重算一次的樣本外年化報酬、波動、最大回撤、最差 5% 日；可設單檔上限。
+- **定期定額 → 金額分配**（`POST /api/dca/allocate`）：每月總金額依風險分給各計畫標的（以 100 元為單位），並和目前金額用同一段歷史回測比較投入、市值、報酬、年化。
+- **策略研究 → 權重方式**：等權重（原本）、反波動率、風險平價、HRP，用訊號日以前 120 個交易日的報酬計算、受單檔上限限制；可信度檢查的快速模擬器對風險平價／HRP 以反波動率近似。
+- **可信度檢查 → 組合式交叉驗證與過度擬合機率（PBO）**：參數掃描的每一格用 skfolio CombinatorialPurgedCV（8 段取 2、前後清除 5 天）挑訓練期最佳、看測試期排名，算 PBO 與 7 條樣本外路徑的夏普分布。
+- 依賴：skfolio 與 scikit-learn、scipy、cvxpy-base、clarabel、plotly 等（`terminal/requirements.skfolio.lock`），只裝在 fin-terminal 映像（約 +275 MB），其他引擎不受影響。
+- 修正 `test_toolkit` 的財報日期寫死成 2026-11-05，日期過了就失敗。
+
+升級：`./install.sh terminal`。
 
 ## 🧪 策略研究：可信度檢查、處置股、模擬追蹤；AI 寫作規則（2026.10.27-47）
 

@@ -24,8 +24,10 @@ DEFAULTS = {
     "start": "2016-01-01", "end": None, "benchmark": "0050",
     "universe": {"market": "all", "min_value": 20.0, "exclude_finance": False, "include_etf": False, "industries": [],
                  "exclude_disposal": True},
-    "fee_discount": 0.6, "slippage": 0.001,
+    "fee_discount": 0.6, "slippage": 0.001, "weighting": "equal",
 }
+WEIGHTING = {"equal": "等權重", "inverse_vol": "反波動率", "risk_parity": "風險平價", "hrp": "階層風險平價（HRP）"}
+W_LOOKBACK = 120  # trading days of returns behind the non-equal weightings (point in time: up to the signal day)
 REBALANCE = {"D": "每日", "W": "每週", "M": "每月", "Q": "每季", "revenue": "月營收公布後（每月 10 日後）",
              "financial": "財報公布後（5/15、8/14、11/14、3/31 後）"}
 FEE, TAX, TAX_ETF = 0.001425, 0.003, 0.001
@@ -62,7 +64,61 @@ def normalize(spec: dict) -> dict:
     s["benchmark"] = str(s["benchmark"] or "0050").replace(".TWO", "").replace(".TW", "")
     s["fee_discount"] = max(0.0, min(float(s["fee_discount"]), 1.0))
     s["slippage"] = max(0.0, min(float(s["slippage"]), 0.02))
+    if s["weighting"] not in WEIGHTING:
+        raise SpecError(f"權重方式要是 {', '.join(WEIGHTING)}")
     return s
+
+
+def cap_weights(w: np.ndarray, cap: float) -> np.ndarray:
+    """Normalise to 1, then no position above `cap`: the excess goes to the others in proportion; when every
+    position is at the cap the rest stays in cash (same as equal weight under max_weight)."""
+    w = np.asarray(w, dtype=float)
+    w = np.where(np.isfinite(w) & (w > 0), w, 0.0)
+    if not len(w):
+        return w
+    w = w / w.sum() if w.sum() > 0 else np.full(len(w), 1 / len(w))
+    if cap * len(w) <= 1 + 1e-12:
+        return np.full(len(w), cap)
+    for _ in range(len(w)):
+        over = w > cap + 1e-12
+        if not over.any():
+            break
+        excess = float((w[over] - cap).sum())
+        w[over] = cap
+        free = ~over & (w < cap)
+        if not free.any():
+            break
+        w[free] += excess * w[free] / w[free].sum()
+    return w
+
+
+def pick_weights(s: dict, cols: list[int], closes: np.ndarray, i: int, allow_opt: bool = True) -> np.ndarray:
+    """Weights for the stocks picked on day i, from returns up to and including day i only."""
+    n = len(cols)
+    m = s.get("weighting", "equal")
+    if not n:
+        return np.zeros(0)
+    if m == "equal" or n == 1:
+        return cap_weights(np.ones(n), s["max_weight"])
+    win = closes[max(0, i - W_LOOKBACK):i + 1][:, cols]
+    with np.errstate(invalid="ignore", divide="ignore"):
+        R = win[1:] / win[:-1] - 1
+    R = np.nan_to_num(R, nan=0.0, posinf=0.0, neginf=0.0)
+    if len(R) < 20:
+        return cap_weights(np.ones(n), s["max_weight"])
+    if m == "inverse_vol" or not allow_opt:
+        sd = R.std(axis=0)
+        inv = np.where(sd > 1e-9, 1 / np.where(sd > 1e-9, sd, 1), np.nan)
+        inv = np.where(np.isfinite(inv), inv, np.nanmean(inv) if np.isfinite(inv).any() else 1.0)
+        return cap_weights(inv, s["max_weight"])
+    try:
+        from skfolio import RiskMeasure
+        from skfolio.optimization import HierarchicalRiskParity, RiskBudgeting
+        model = HierarchicalRiskParity() if m == "hrp" else RiskBudgeting(risk_measure=RiskMeasure.VARIANCE)
+        model.fit(R)
+        return cap_weights(np.asarray(model.weights_, dtype=float), s["max_weight"])
+    except Exception:  # noqa: BLE001  (singular covariance, solver failure …) → inverse volatility
+        return pick_weights({**s, "weighting": "inverse_vol"}, cols, closes, i)
 
 
 def spec_hash(spec: dict) -> str:
@@ -286,8 +342,8 @@ def simulate(s: dict, cal, rebal, cond, score, codes, end=None, fixed: dict | No
                 _picks_np(condv[i], None if scorev is None else scorev[i], liqv[i], codes, s)
             sel = [c for c in sel if c in pos]
             picks_hist.append((d, len(sel)))
-            w = min(1.0 / len(sel), s["max_weight"]) if sel else 0
-            pending = {c: w for c in sel}
+            ws = pick_weights(s, [pos[c] for c in sel], Cv, i)
+            pending = {c: float(w) for c, w in zip(sel, ws)}
     eq = pd.Series(equity, index=pd.DatetimeIndex(dates))
     return eq, trades, pd.Series(n_hold, index=eq.index), buys_total, picks_hist, shares
 

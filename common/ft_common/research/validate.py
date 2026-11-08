@@ -53,6 +53,7 @@ class Sim:
         self.buy_cost = fee + s["slippage"]
         self.sell_cost = fee + B.TAX + s["slippage"]
         self.maskv = P["mask"].values
+        self.closes = C.ffill().values
 
     def picks(self, cond: pd.DataFrame, score: pd.DataFrame | None) -> list[np.ndarray]:
         cv = cond.reindex(index=self.cal, columns=self.codes, fill_value=False).values
@@ -70,26 +71,27 @@ class Sim:
         earn close-to-close returns on days a … e, where e is the next signal day (or the end)."""
         base = self.reb_i[0]
         out = np.zeros(self.end_i - base)
-        prev: set = set()
-        prev_w = 0.0
+        prev: dict = {}
         for k, i in enumerate(self.reb_i):
             a = i + 1
             e = self.reb_i[k + 1] if k + 1 < len(self.reb_i) else self.end_i
             if a > e:
                 continue
             idx = picks[k]
-            w = min(1.0 / len(idx), self.s["max_weight"]) if len(idx) else 0.0
-            cur = set(idx.tolist())
-            cost = w * len(cur - prev) * self.buy_cost + prev_w * len(prev - cur) * self.sell_cost
+            # HRP / risk parity need an optimiser per rebalance → the fast simulator uses inverse volatility for them
+            wv = B.pick_weights(self.s, list(idx), self.closes, i, allow_opt=False) if len(idx) else np.zeros(0)
+            cur = dict(zip(idx.tolist(), wv.tolist()))
+            cost = sum(w for c, w in cur.items() if c not in prev) * self.buy_cost + \
+                sum(w for c, w in prev.items() if c not in cur) * self.sell_cost
             if len(idx):  # the new holdings own the execution day too (gap + open→close, approximated by close→close)
                 cum = np.cumprod(1.0 + self.R[a:e + 1][:, idx], axis=0)
-                val = np.concatenate([[1.0], w * cum.sum(axis=1) + (1 - w * len(idx))])
+                val = np.concatenate([[1.0], cum @ wv + (1 - wv.sum())])
                 r = val[1:] / val[:-1] - 1
             else:
                 r = np.zeros(e - a + 1)
             r[0] = (1 + r[0]) * (1 - cost) - 1
             out[a - base - 1: e - base] = r
-            prev, prev_w = cur, w
+            prev = cur
         return pd.Series(out, index=self.cal[base + 1: self.end_i + 1])
 
 
@@ -286,6 +288,7 @@ def scan(spec: dict, params: list[str], P: dict | None = None, sim: Sim | None =
     cur_sh, cur_nb = sh[cur], nb[cur]
     spike = bool(np.isfinite(cur_sh) and np.isfinite(cur_nb) and cur_sh > 0 and cur_nb < cur_sh * 0.6)
     wf = walk_forward(rets, axes, cur)
+    cp = cpcv(rets, axes)
     notes = []
     if np.isfinite(cur_sh) and cur_sh <= 0:
         notes.append(f"目前參數的夏普 {cur_sh:.2f} ≤ 0：策略本身沒有賺到風險報酬，參數穩不穩定的意義不大。")
@@ -299,7 +302,11 @@ def scan(spec: dict, params: list[str], P: dict | None = None, sim: Sim | None =
         o, c = wf["oos"], wf["current"]
         notes.append(f"樣本外前進（每年用之前的資料挑參數）：夏普 {o['sharpe']}、年化 {o['cagr']:+.1f}%；"
                      f"同期間固定用目前參數：夏普 {c['sharpe']}、年化 {c['cagr']:+.1f}%。")
-    return {"params": [allp[p] | {"values": ax} for p, ax in zip(params, axes) if ax != [None]],
+    if cp.get("pbo") is not None:
+        notes.append(f"{'✗' if cp['pbo'] > 50 else '✓'} 過度擬合機率（PBO）{cp['pbo']:.0f}%：{cp['splits']} 種切法裡，訓練期最好的參數到了測試期"
+                     f"落在所有參數後半段的比例（> 50% 代表「挑最好的參數」這件事本身沒有用）；{cp['paths']} 條樣本外路徑的夏普"
+                     f"中位數 {cp['oos_sharpe']['median']}（{cp['oos_sharpe']['min']}～{cp['oos_sharpe']['max']}）。")
+    return {"cpcv": cp, "params": [allp[p] | {"values": ax} for p, ax in zip(params, axes) if ax != [None]],
             "sharpe": [[_r(v) for v in row] for row in sh], "cagr": [[_r(v, 1) for v in row] for row in cg],
             "neighbour": [[_r(v) for v in row] for row in nb], "current": list(map(int, cur)), "best": list(map(int, best)),
             "plateau_best": list(map(int, plateau_best)), "on_edge": bool(edge), "spike": spike,
@@ -347,6 +354,51 @@ def walk_forward(rets: dict[tuple, pd.Series], axes, cur: tuple, min_train_years
     o, c = pd.concat(oos), pd.concat(curp)
     return {"folds": folds, "oos": {k: _r(v) for k, v in stats(o).items()}, "current": {k: _r(v) for k, v in stats(c).items()},
             "from": o.index[0].date().isoformat()}
+
+
+# ---------------------------------------------------------------- 5) combinatorial purged CV (skfolio) → PBO
+def cpcv(rets: dict[tuple, pd.Series], axes, n_folds: int = 8, n_test_folds: int = 2) -> dict:
+    """Combinatorial purged cross-validation over the scan grid (Bailey & López de Prado): for every way of picking
+    2 of 8 time blocks as the test set (purged and embargoed around them), choose the grid point with the best
+    Sharpe on the other 6 blocks and see where it ranks on the test blocks. PBO = share of splits where the
+    in-sample winner lands in the bottom half out of sample. Test blocks are also stitched into paths."""
+    if len(rets) < 4:
+        return {}
+    keys = list(rets)
+    M = pd.concat([rets[k] for k in keys], axis=1).fillna(0.0).values
+    if len(M) < 500:
+        return {"note": "資料太短（少於 500 個交易日），不做組合式交叉驗證"}
+    try:
+        from skfolio.model_selection import CombinatorialPurgedCV
+    except ImportError:
+        return {"note": "沒有安裝 skfolio，略過組合式交叉驗證"}
+    cv = CombinatorialPurgedCV(n_folds=n_folds, n_test_folds=n_test_folds, purged_size=5, embargo_size=5)
+
+    def sharpe(x):
+        sd = x.std(axis=0)
+        return np.where(sd > 0, x.mean(axis=0) / np.where(sd > 0, sd, 1) * math.sqrt(252), 0.0)
+    path_ids = cv.get_path_ids()
+    paths: dict[int, list] = {}
+    logits, best_is = [], []
+    for k, (tr, tests) in enumerate(cv.split(M)):
+        s_tr = sharpe(M[tr])
+        b = int(np.argmax(s_tr))
+        best_is.append(float(s_tr[b]))
+        te = np.concatenate(tests)
+        s_te = sharpe(M[te])
+        rank = (s_te < s_te[b]).sum() + 0.5 * ((s_te == s_te[b]).sum() - 1) + 1
+        w = rank / (len(keys) + 1)
+        logits.append(math.log(w / (1 - w)))
+        for j, t in enumerate(tests):
+            paths.setdefault(int(path_ids[k, j]), []).append((int(t[0]), M[t, b]))
+    ps = []
+    for p in paths.values():
+        r = np.concatenate([x for _, x in sorted(p, key=lambda z: z[0])])
+        ps.append(float(sharpe(r[:, None])[0]))
+    ps = np.array(ps)
+    return {"splits": len(logits), "paths": len(ps), "pbo": round(float(np.mean(np.array(logits) < 0)) * 100, 1),
+            "oos_sharpe": {"median": _r(np.median(ps)), "min": _r(ps.min()), "max": _r(ps.max())},
+            "is_sharpe_median": _r(np.median(best_is)), "paths_sharpe": [_r(x) for x in ps]}
 
 
 # ---------------------------------------------------------------- entry point

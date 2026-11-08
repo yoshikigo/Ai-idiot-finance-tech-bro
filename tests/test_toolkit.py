@@ -47,7 +47,8 @@ def test_greeks_and_max_pain():
 class FakeTicker:
     def __init__(self, sym):
         self.options = ((dt.date.today() + dt.timedelta(days=3)).isoformat(), (dt.date.today() + dt.timedelta(days=31)).isoformat())
-        idx = pd.to_datetime(["2026-11-05 16:00", "2026-07-30 16:00", "2026-04-30 16:00"]).tz_localize("America/New_York")
+        nxt = (dt.date.today() + dt.timedelta(days=20)).isoformat()  # always in the future, whenever the test runs
+        idx = pd.to_datetime([f"{nxt} 16:00", "2026-07-30 16:00", "2026-04-30 16:00"]).tz_localize("America/New_York")
         self._ed = pd.DataFrame({"EPS Estimate": [2.1, 1.9, 1.7], "Reported EPS": [np.nan, 2.0, 1.6], "Surprise(%)": [np.nan, 5.3, -5.9]}, index=idx)
         self.recommendations = pd.DataFrame([{"period": "0m", "strongBuy": 10, "buy": 20, "hold": 5, "sell": 1, "strongSell": 0}])
         self.upgrades_downgrades = pd.DataFrame({"Firm": ["Morgan Stanley"], "ToGrade": ["Overweight"], "FromGrade": ["Equal-Weight"], "Action": ["up"]},
@@ -100,7 +101,7 @@ def test_research_earnings_value(yf):
     t = yf.research("AAPL")["text"]
     assert "目標價" in t and "+20.0%" in t and "Morgan Stanley" in t and "內部人" in t and "Vanguard" in t
     e = yf.earnings("AAPL")
-    assert e["data"]["next"] == "2026-11-05" and e["data"]["beats"] == 1 and e["data"]["quarters"] == 2
+    assert e["data"]["next"] == (dt.date.today() + dt.timedelta(days=20)).isoformat() and e["data"]["beats"] == 1 and e["data"]["quarters"] == 2
     v = yf.value("AAPL")["data"]
     assert v["graham"] == pytest.approx((22.5 * 2 * 10) ** 0.5) and v["ncav"] == pytest.approx((80 - 50) / 10)
     assert v["fscore"] >= 6 and v["roe"][0] == pytest.approx(20.0)

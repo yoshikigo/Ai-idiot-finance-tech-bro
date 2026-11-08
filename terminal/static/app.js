@@ -611,6 +611,8 @@ function labSpec(i, box, st, cat) {
     h("label", {}, "停損 %", num("stop_loss", 100)),
     h("label", {}, "停利 %", num("take_profit", 100)),
     h("label", {}, "單檔上限 %", num("max_weight", 100)),
+    h("label", { title: "選出的股票各放多少：等權重；反波動率＝波動大的少放；風險平價、HRP 用 skfolio 依過去 120 日的波動與相關性分配" }, "權重",
+      sel("weighting", [["equal", "等權重"], ["inverse_vol", "反波動率"], ["risk_parity", "風險平價"], ["hrp", "階層風險平價 HRP"]])),
     h("label", {}, "回測起點", start)),
     h("div", { class: "lab-grid" },
     h("label", {}, "市場", uSel),
@@ -684,7 +686,7 @@ function labReport(i, box, st) {
   const r = st.res; if (!r || !r.metrics) { box.append(h("div", { class: "empty" }, "還沒有回測結果")); return; }
   const m = r.metrics, s = r.spec;
   if (st.expl) box.append(h("div", { class: "lab-expl", style: "margin-bottom:6px" }, "AI 轉換說明：" + st.expl));
-  box.append(h("div", { class: "lab-title" }, h("b", {}, s.name), h("span", {}, ` ${m.start} ～ ${m.end} · ${CATALOG.rebalance[s.rebalance]} · 前 ${s.top_n} 檔 · 基準 ${s.benchmark}${r.ms != null ? ` · ${(r.ms / 1000).toFixed(1)} 秒` : ""}`),
+  box.append(h("div", { class: "lab-title" }, h("b", {}, s.name), h("span", {}, ` ${m.start} ～ ${m.end} · ${CATALOG.rebalance[s.rebalance]} · 前 ${s.top_n} 檔${s.weighting && s.weighting !== "equal" ? ` · ${{ inverse_vol: "反波動率", risk_parity: "風險平價", hrp: "HRP" }[s.weighting]}` : ""} · 基準 ${s.benchmark}${r.ms != null ? ` · ${(r.ms / 1000).toFixed(1)} 秒` : ""}`),
     h("span", { class: "grow" }),
     h("button", { class: "btn ghost", title: "回測好看不代表上線會一樣：檢查是不是運氣、是不是參數調太細", onclick: () => { st.tab = "valid"; renderPane(i); if (!st.val) labValidateRun(i); } }, "可信度檢查"),
     h("button", { class: "btn ghost", title: "從今天開始每天用最新資料算一次這個策略會買賣什麼（不花真錢），和回測預期比較；記錄寫進 Obsidian", onclick: () => trackStart(i, s) }, "📡 開始模擬追蹤")));
@@ -2690,6 +2692,7 @@ function holdView(i, body, d, dd) {
     const covered = d.exposure.reduce((a, x) => a + x.weight, 0);
     body.append(h("section", { class: "fx-sec" }, h("h4", {}, `供應鏈曝險（佔總市值；地圖外 ${nf(Math.max(0, 100 - covered), 1)}%）`), ex));
   }
+  if (d.rows.filter((r) => r.value_twd).length >= 2) body.append(healthSection(i));
   body.append(dcaSection(i, dd));
 }
 
@@ -2851,6 +2854,7 @@ function dcaSection(i, dd) {
         h("button", { class: "mini", onclick: () => { S.panes[i].dcaEditing = r.id; S.panes[i].dcaRow = r; renderPane(i); } }, "編輯"), del)));
   }
   tbl.append(tb);
+  if (dd.plans.filter((r) => !r.error).length >= 2) sec.append(dcaSplitBox(i, dd));
   sec.append(h("div", { class: "hold-scroll" }, tbl),
     h("div", { class: "muted dca-note" }, "依每期扣款日（遇假日順延到下一個交易日）的收盤價計算；台股與 ETF 用還原權息價（股利再投入），基金用淨值（配息型不含配息），美元資產以當天匯率換算台幣。不含稅，實際成交以券商為準。"));
   return sec;
@@ -4279,6 +4283,107 @@ async function renderTrackOne(i, body, p) {
   box.append(h("ul", { class: "lab-notes" }, h("li", {}, "每個換股日選出的名單會「凍結」，之後資料修正也不改寫，避免事後美化。"),
     h("li", {}, `Obsidian：${"finance"}/策略追蹤/${t.name}/總覽.md（每天更新）與每次換股一篇。`),
     h("li", {}, "回測預期＝開始追蹤時那次回測的每日平均報酬與波動推算的範圍；落在範圍下緣以下代表上線表現明顯不如回測。")));
+}
+
+
+/* ---------- 組合體檢（skfolio）：風險貢獻、相關性、各配置方法（只在本機計算，不經過 AI） */
+const HEALTH_METHODS = ["current", "equal", "inverse_vol", "risk_parity", "hrp", "min_cvar"];
+
+function healthSection(i) {
+  const p = S.panes[i];
+  const sec = h("section", { class: "fx-sec health-sec" });
+  const mw = h("select", { title: "單檔權重上限（只影響風險平價、HRP、最小 CVaR）" },
+    ...[["0", "單檔不設上限"], ["0.4", "單檔最多 40%"], ["0.3", "單檔最多 30%"], ["0.2", "單檔最多 20%"]].map(([v, l]) => h("option", { value: v, selected: String(p.hMax || "0") === v ? true : null }, l)));
+  const out = h("div", {});
+  const go = h("button", { class: "btn ghost", onclick: () => run() }, p.health ? "重新體檢" : "▶ 開始體檢");
+  sec.append(h("h4", {}, "組合體檢", h("span", { class: "muted", style: "font-weight:400" }, "　每檔貢獻多少風險、彼此相關性，和幾種不需要預測報酬的配置方法比一比（skfolio，只在本機計算）")),
+    h("div", { class: "health-bar" }, mw, go), out);
+  const run = async () => {
+    p.hMax = mw.value; go.disabled = true;
+    out.innerHTML = `<div class="loading">讀取各持股約 3 年的日報酬並計算（第一次約 10–30 秒）</div>`;
+    try { p.health = await api(`/api/me/holdings/health?max_weight=${mw.value}`); } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; go.disabled = false; return; }
+    go.disabled = false; go.textContent = "重新體檢";
+    drawHealth(out, p.health);
+  };
+  if (p.health) drawHealth(out, p.health);
+  return sec;
+}
+
+function drawHealth(out, d) {
+  out.innerHTML = "";
+  const nm = (s) => (d.names[s] && d.names[s] !== s ? `${s.replace(/\.TWO?$/, "")} ${d.names[s]}` : s);
+  if (d.notes.length) out.append(h("ul", { class: "val-verdict" }, ...d.notes.map((x) => h("li", {}, x))));
+  // 1) money vs risk
+  const mx = Math.max(...d.symbols.map((s) => Math.max(d.current[s] || 0, d.risk[s] || 0)), 1);
+  const bars = h("div", { class: "health-rc" }, h("div", { class: "hrc-leg muted" }, h("i", { class: "w" }), "資金比重　", h("i", { class: "r" }), "風險貢獻（佔組合波動）"));
+  for (const s of [...d.symbols].sort((a, b) => (d.risk[b] || 0) - (d.risk[a] || 0)))
+    bars.append(h("div", { class: "hrc-row" }, h("span", { class: "hrc-n", title: nm(s) }, nm(s)),
+      h("span", { class: "hrc-t" }, h("i", { class: "w", style: `width:${(d.current[s] / mx) * 100}%` }), h("i", { class: "r", style: `width:${(Math.max(0, d.risk[s]) / mx) * 100}%` })),
+      h("b", {}, `${nf(d.current[s], 1)}% → ${nf(d.risk[s], 1)}%`)));
+  out.append(h("div", { class: "lab-sec" }, "資金 vs 風險"), bars);
+  // 2) methods
+  const ms = d.methods.filter((m) => !m.error);
+  const t = h("table", { class: "grid health-tbl" });
+  const head = `<tr><th>持股</th>${ms.map((m) => `<th>${esc(m.label)}</th>`).join("")}</tr>`;
+  const wrows = d.symbols.map((s) => `<tr><td class="nm">${esc(nm(s))}</td>${ms.map((m) => `<td>${nf(m.weights[s], 1)}%</td>`).join("")}</tr>`).join("");
+  const met = (k, label, fmt, good) => {
+    const vals = ms.map((m) => (m.oos || {})[k]);
+    const best = good ? (good > 0 ? Math.max(...vals.filter((v) => v != null)) : Math.min(...vals.filter((v) => v != null))) : null;
+    return `<tr class="hm"><td class="nm">${label}</td>${vals.map((v) => `<td class="${v != null && v === best ? "hbest" : ""}">${v == null ? "—" : fmt(v)}</td>`).join("")}</tr>`;
+  };
+  t.innerHTML = `<thead>${head}</thead><tbody>${wrows}
+    <tr class="hsep"><td colspan="${ms.length + 1}">樣本外表現（每季用前一年資料重算權重${(ms.find((m) => m.oos && m.oos.from) || {}).oos ? `，${ms.find((m) => m.oos && m.oos.from).oos.from} ～ ${ms.find((m) => m.oos && m.oos.from).oos.to}` : ""}）</td></tr>
+    ${met("cagr", "年化報酬", (v) => fmtp(v), 1)}${met("vol", "年化波動", (v) => v.toFixed(1) + "%", -1)}${met("sharpe", "報酬／波動", (v) => v.toFixed(2), 1)}
+    ${met("mdd", "最大回撤", (v) => fmtp(v), 1)}${met("cvar95", "最差 5% 日平均", (v) => fmtp(v), 1)}</tbody>`;
+  out.append(h("div", { class: "lab-sec" }, "配置方法比較（權重與樣本外表現）"), h("div", { class: "hold-scroll" }, t));
+  // 3) correlation
+  if (d.symbols.length <= 12) {
+    const c = h("table", { class: "grid health-corr" });
+    c.innerHTML = `<thead><tr><th></th>${d.symbols.map((s) => `<th title="${esc(nm(s))}">${esc(s.replace(/\.TWO?$/, ""))}</th>`).join("")}</tr></thead><tbody>${
+      d.symbols.map((s, a) => `<tr><td class="nm">${esc(nm(s))}</td>${d.corr[a].map((v, b) => `<td style="background:rgba(255,153,96,${a === b ? 0 : Math.max(0, v) * 0.6})">${a === b ? "" : v.toFixed(2)}</td>`).join("")}</tr>`).join("")}</tbody>`;
+    out.append(h("div", { class: "lab-sec" }, "日報酬相關係數（越接近 1 越同漲同跌）"), h("div", { class: "hold-scroll" }, c));
+  }
+  out.append(h("ul", { class: "lab-notes" }, h("li", {}, d.method_note), h("li", {}, `${d.from} ～ ${d.to}，${d.days} 個交易日。`),
+    Object.keys(d.skipped || {}).length ? h("li", {}, "略過：" + Object.entries(d.skipped).map(([k, v]) => `${k}（${v}）`).join("、")) : null,
+    h("li", {}, "風險平價＝每檔貢獻一樣多的波動；HRP＝先依相關性分群再分配；最小 CVaR＝讓最差 5% 日子的平均損失最小。都不需要預測報酬，所以比「最大夏普」穩定。")));
+}
+
+/* ---------- 定期定額金額分配（skfolio 風險預算） */
+function dcaSplitBox(i, dd) {
+  const p = S.panes[i];
+  const live = dd.plans.filter((r) => !r.error && (!r.end || r.end >= new Date().toLocaleDateString("sv-SE")));
+  const per = (r) => r.amount * (r.freq === "monthly" ? String(r.days).split(",").length : r.freq === "weekly" ? 4.33 * String(r.days).split(",").length : 21);
+  const total = Math.round(live.reduce((a, r) => a + per(r), 0));
+  const method = h("select", {}, ...[["risk_parity", "風險平價"], ["hrp", "階層風險平價（HRP）"], ["inverse_vol", "反波動率"], ["min_cvar", "最小 CVaR"], ["equal", "等金額"]]
+    .map(([v, l]) => h("option", { value: v, selected: (p.dcaM || "risk_parity") === v ? true : null }, l)));
+  const tot = h("input", { type: "number", min: "100", step: "100", value: p.dcaT || total, title: "每月總金額（台幣）" });
+  const out = h("div", {});
+  const go = h("button", { class: "btn ghost" }, "分配");
+  const box = h("div", { class: "dca-split" }, h("div", { class: "health-bar" }, h("span", { class: "muted" }, "每月總金額"), tot, method, go,
+    h("span", { class: "muted" }, "依各標的過去 3 年的波動與相關性分配，並和目前的金額用同一段歷史回測比較（每月 6 日扣款）")), out);
+  go.onclick = async () => {
+    p.dcaM = method.value; p.dcaT = +tot.value; go.disabled = true;
+    out.innerHTML = `<div class="loading">計算中</div>`;
+    const start = live.map((r) => r.start).sort()[0];
+    try {
+      p.dcaSplit = await api("/api/dca/allocate", { method: "POST", json: { plans: live.map((r) => ({ symbol: r.symbol, amount: Math.round(per(r)) })), total: +tot.value, method: method.value, freq: "monthly", days: "6", start } });
+    } catch (e) { out.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; go.disabled = false; return; }
+    go.disabled = false; drawSplit(out, p.dcaSplit);
+  };
+  if (p.dcaSplit) drawSplit(out, p.dcaSplit);
+  return box;
+}
+
+function drawSplit(out, d) {
+  const c = d.compare || {}, a = c.current || {}, b = c.suggested || {};
+  const t = h("table", { class: "grid" });
+  t.innerHTML = `<thead><tr><th>標的</th><th>目前每月</th><th>建議每月（${esc(d.label)}）</th><th>權重</th><th>風險貢獻</th><th>年化波動</th></tr></thead><tbody>${
+    d.rows.map((r) => `<tr><td class="nm">${esc(r.symbol.replace(/\.TWO?$/, ""))} ${esc(r.name || "")}</td><td>${nf(r.current, 0)}</td><td><b>${nf(r.amount, 0)}</b></td><td>${nf(r.weight, 1)}%</td><td>${nf(r.risk, 1)}%</td><td>${nf(r.vol, 1)}%</td></tr>`).join("")}</tbody>`;
+  const k = (x) => `投入 ${nf(x.invested, 0)}・市值 ${nf(x.value, 0)}・報酬 ${fmtp(x.ret)}・年化 ${fmtp(x.xirr)}`;
+  out.innerHTML = "";
+  out.append(h("div", { class: "hold-scroll" }, t),
+    h("div", { class: "dca-cmp" }, h("div", {}, h("span", { class: "muted" }, "目前金額回測　"), k(a)), h("div", {}, h("span", { class: "muted" }, "建議金額回測　"), k(b))),
+    h("div", { class: "muted dca-note" }, "回測期間從最早的計畫開始日起、每月 6 日扣款，兩種分配用同樣的日期與價格；過去的波動與相關性不保證未來。要採用就編輯各計畫的金額。"));
 }
 
 boot();

@@ -333,6 +333,7 @@ def test_random_test_and_scan(R):
     sc = out["scan"]
     assert len(sc["sharpe"]) == 5 and len(sc["sharpe"][0]) == 5 and sc["current"] == [2, 1]
     assert sc["walk_forward"]["folds"] and sc["walk_forward"]["oos"]["sharpe"] is not None
+    assert sc["cpcv"]["splits"] == 28 and sc["cpcv"]["paths"] == 7 and 0 <= sc["cpcv"]["pbo"] <= 100
     assert [p["id"] for p in V.numeric_params(spec)] == ["c0:0", "top_n"]
     assert V.apply_param(spec, "c0:0", 70)["conditions"] == ["收盤價 > 70"]
     assert V.grid_values(2, True) == [1, 2, 3, 4, 5] and V.grid_values(10, True) == [6, 8, 10, 12, 14]
@@ -397,3 +398,24 @@ def test_forward_track_freezes_picks_and_writes_notes(R, tmp_path, monkeypatch):
     assert any(tr["code"] == "9003" for tr in t2["last"]["trades"]) or any(h["code"] == "9003" for h in t2["last"]["holdings"])
     assert T.action(t["id"], "pause")["status"] == "paused" and T.update_all() == 0
     assert T.action(t["id"], "delete") is None and T.all_tracks() == []
+
+
+def test_weighting_options(R):
+    store, F, expr, collect, bt = R
+    import numpy as np
+    assert list(bt.cap_weights(np.array([0.7, 0.2, 0.1]), 0.5)) == pytest.approx([0.5, 0.3333333, 0.1666667], abs=1e-6)
+    assert list(bt.cap_weights(np.array([1, 1, 1]), 0.2)) == pytest.approx([0.2, 0.2, 0.2])
+    rng = np.random.default_rng(3)
+    closes = np.cumprod(1 + np.column_stack([rng.normal(0, 0.03, 200), rng.normal(0, 0.01, 200)]), axis=0) * 100
+    s = bt.normalize({"conditions": ["收盤價 > 0"], "max_weight": 1, "weighting": "inverse_vol"})
+    w = bt.pick_weights(s, [0, 1], closes, 199)
+    assert w.sum() == pytest.approx(1) and w[0] < 0.4 < w[1]
+    for m in ("hrp", "risk_parity"):
+        w = bt.pick_weights({**s, "weighting": m}, [0, 1], closes, 199)
+        assert w.sum() == pytest.approx(1) and w[0] < w[1]
+    with pytest.raises(bt.SpecError):
+        bt.normalize({"conditions": ["收盤價 > 0"], "weighting": "magic"})
+    _prices(store, {"9001": 0.004, "9002": 0.001, "9003": -0.002})
+    spec = {"conditions": ["收盤價 > 0"], "rank": "收盤價", "top_n": 3, "rebalance": "M", "start": "2024-01-01",
+            "fee_discount": 0, "slippage": 0, "max_weight": 1, "universe": {"min_value": 0}, "weighting": "inverse_vol"}
+    assert bt.run(spec)["metrics"]["cagr"] is not None

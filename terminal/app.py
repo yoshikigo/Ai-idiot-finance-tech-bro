@@ -5,6 +5,7 @@ from Ollama) and a reverse proxy to the five engine workers.
 """
 from __future__ import annotations
 
+import datetime as dt
 import json
 import os
 import re
@@ -1002,6 +1003,52 @@ async def api_dca_backtest(req: Request):
     b = await req.json()
     res = await run_in_threadpool(_dca_run, b)
     return {"results": res, "text": dca.text(res)}
+
+
+@app.post("/api/dca/allocate")
+async def api_dca_allocate(req: Request):
+    """定期定額金額分配（skfolio）：每期總金額依風險分給各標的，並和目前的金額做同期間回測比較。"""
+    from ft_common import allocate
+    b = await req.json()
+    plans = [p for p in (b.get("plans") or []) if p.get("symbol")][:8]
+    if len(plans) < 2:
+        raise HTTPException(400, "至少要兩個定期定額標的")
+    syms = [p["symbol"] if p["symbol"].upper().startswith("FUND:") else (context.resolve(p["symbol"]) or p["symbol"].upper()) for p in plans]
+    total = float(b.get("total") or sum(float(p.get("amount") or 0) for p in plans))
+    method = b.get("method") or "risk_parity"
+
+    def run():
+        sp = allocate.dca_split(syms, total, method)
+        cur = {s: float(p.get("amount") or 0) for s, p in zip(syms, plans)}
+        new = {r["symbol"]: r["amount"] for r in sp["rows"]}
+        freq, days, start = b.get("freq") or "monthly", b.get("days") or "6", b.get("start") or None
+
+        def book(amounts):
+            flows, inv, val, per = [], 0.0, 0.0, []
+            for s, a in amounts.items():
+                if a < 1:
+                    continue
+                try:
+                    r = dca.simulate(s, a, freq, days, start, None, lots_out=0)
+                except (ValueError, KeyError):
+                    continue
+                inv += r["invested"]
+                val += r["value"]
+                flows += [(dt.date.fromisoformat(x["date"]), -x["amount"]) for x in r["lots"]]
+                end = dt.date.fromisoformat(r["end"])
+                flows.append((end, r["value"]))
+                per.append({"symbol": s, "amount": a, "invested": r["invested"], "value": r["value"], "ret": r["ret"], "mdd": r["mdd"]})
+            return {"invested": inv, "value": val, "ret": (val / inv - 1) * 100 if inv else None,
+                    "xirr": dca.xirr(sorted(flows)) if flows else None, "rows": per}
+        sp["compare"] = {"current": book(cur), "suggested": book(new)}
+        for r in sp["rows"]:
+            r["name"] = _dca_name(r["symbol"])
+            r["current"] = cur.get(r["symbol"])
+        return sp
+    try:
+        return await run_in_threadpool(run)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
 
 
 @app.post("/api/dca/ai")

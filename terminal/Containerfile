@@ -4,6 +4,9 @@ FROM docker.io/library/python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 COPY terminal/requirements.lock /tmp/req.lock
 RUN pip install -r /tmp/req.lock
+# skfolio（組合體檢、定期定額分配、策略研究權重與組合式交叉驗證）: only this image, ~275 MB
+COPY terminal/requirements.skfolio.lock /tmp/req-skfolio.lock
+RUN pip install -r /tmp/req-skfolio.lock
 ARG FINGPT_REF=fdb04c9a273d1ccc3764b09b8e3ed1e708e57566
 COPY common /app/common
 COPY terminal /app/terminal
