@@ -888,6 +888,8 @@ async function renderGP(i, body, p) {
     ranges.append(h("button", { class: p.ev ? "on ev-btn" : "ev-btn", title: "God's Eye View 偵測到的現實世界事件（與這檔相關的區域）",
       onclick: () => { S.panes[i].ev = !p.ev; renderPane(i); } }, plain("🌐 事件")));
   }
+  if (XPEER[p.sec]) ranges.append(h("button", { class: p.peer !== false ? "on peer-btn" : "peer-btn", title: "同一個台幣交易對在另一家台灣交易所的收盤價（線），看兩邊價差",
+    onclick: () => { S.panes[i].peer = p.peer === false; renderPane(i); } }, plain("⇄ " + XPEER[p.sec][1])));
   const box = h("div", { class: "chart-box" });
   body.append(head, ranges, box);
   try {
@@ -904,10 +906,28 @@ async function renderGP(i, body, p) {
     drawCandles(i, box, rows, !intraday);
     if (p.fc && !intraday) overlayForecast(i, p.sec, p.fc, legend);
     if (p.kr && !intraday) { const kl = h("span", { class: "legend kr-legend" }); ranges.append(kl); overlayKronos(i, p.sec, p.kr, kl); }
+    if (XPEER[p.sec] && p.peer !== false) { const pl = h("span", { class: "legend peer-legend" }); ranges.append(pl); overlayPeer(i, p.sec, cur, rows, pl); }
     if (p.ev && !intraday) overlayEvents(i, p.sec, rows);
     if (majorOn(p) && !intraday) overlayMajor(i, p.sec, rows);
     if (p.focusDate && !intraday) { focusChartOn(i, p.focusDate); S.panes[i].focusDate = null; }
   } catch (e) { box.innerHTML = `<div class="errbox">${esc(e.message)}</div>`; head.innerHTML = ""; }
+}
+
+/* ---------- 台灣交易所比價：MAX（XXX-TWD）vs BitoPro（XXX-TWD.BITO） */
+const XPEER = {};
+for (const a of ["USDT", "BTC", "ETH"]) { XPEER[a + "-TWD"] = [a + "-TWD.BITO", "BitoPro"]; XPEER[a + "-TWD.BITO"] = [a + "-TWD", "MAX"]; }
+async function overlayPeer(i, sec, cur, rows, legend) {
+  const [peer, label] = XPEER[sec];
+  let pr;
+  try { pr = await api(`/api/history?s=${encodeURIComponent(peer)}&range=${cur[1]}&interval=${cur[2]}`); } catch (e) { legend.textContent = label + " 抓不到"; return; }
+  const ch = S.charts.get(i);
+  if (!ch || S.panes[i].sec !== sec || !pr.length) { if (!pr || !pr.length) legend.textContent = label + " 沒有資料"; return; }
+  const col = "#4ba3ff";
+  const ln = ch.chart.addLineSeries({ color: col, lineWidth: 2, priceLineVisible: false, lastValueVisible: true, title: label });
+  ln.setData(pr.map((r) => ({ time: r.time, value: r.close })));
+  const a = rows[rows.length - 1].close, b = pr[pr.length - 1].close, d = a - b;
+  const me = sec.endsWith(".BITO") ? "BitoPro" : "MAX";
+  legend.innerHTML = `<span style="color:${col}">━ ${esc(label)} ${nf(b, pxd(b))}</span> · 價差 ${esc(me)}−${esc(label)} <span class="${cls(d)}">${d > 0 ? "+" : ""}${nf(d, pxd(b))}（${pct(b ? d / b * 100 : 0)}）</span>`;
 }
 
 function chartTheme() {

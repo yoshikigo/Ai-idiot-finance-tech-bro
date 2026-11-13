@@ -43,3 +43,23 @@ def test_max_history_and_quote(monkeypatch):
     q = market.quotes(["USDT-TWD"])[0]
     assert q["last"] == 33.024 and round(q["chg"], 3) == 0.014 and q["currency"] == "TWD"
     assert dca.currency_of("USDT-TWD") == "TWD"
+
+
+BITO = {"data": [{"timestamp": r[0] * 1000, "open": str(r[1]), "high": str(r[2]), "low": str(r[3]), "close": str(r[4]),
+                  "volume": str(r[5])} for r in ROWS] + [{"timestamp": 1794614400000, "open": "33.036", "high": "33.036",
+                                                         "low": "33.036", "close": "33.036", "volume": "0"}]}
+
+
+def test_bitopro_history(monkeypatch):
+    import httpx
+    calls = []
+
+    def get(url, params=None, **kw):
+        calls.append((url, params))
+        return _R(BITO if params["from"] <= ROWS[0][0] else {"data": []})
+
+    monkeypatch.setattr(httpx, "get", get)
+    df = market._twx_history("USDT-TWD.BITO", "5d", "1d", "2026-11-10", "2026-11-15")
+    assert calls[0][0].endswith("/usdt_twd") and calls[0][1]["resolution"] == "1d"
+    assert len(df) == 4 and df["Close"].iloc[-1] == 33.036  # last zero-volume bar kept (current period)
+    assert dca.currency_of("USDT-TWD.BITO") == "TWD"

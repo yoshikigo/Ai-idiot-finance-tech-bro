@@ -68,7 +68,7 @@ MONITORS = {
     "FX": ("外匯", ["TWD=X", "JPY=X", "EURUSD=X", "GBPUSD=X", "CNY=X", "HKD=X", "KRW=X", "AUDUSD=X", "DX-Y.NYB",
                   "EURTWD=X", "JPYTWD=X"]),
     "CMDTY": ("商品", ["CL=F", "BZ=F", "NG=F", "GC=F", "SI=F", "HG=F", "PL=F", "ZC=F", "ZW=F", "ZS=F"]),
-    "CRYPTO": ("加密貨幣", ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "DOGE-USD", "ADA-USD", "USDT-TWD"]),
+    "CRYPTO": ("加密貨幣", ["BTC-USD", "ETH-USD", "SOL-USD", "BNB-USD", "XRP-USD", "DOGE-USD", "ADA-USD", "USDT-TWD", "USDT-TWD.BITO"]),
     "RATES": ("利率 / 債券", ["^IRX", "^FVX", "^TNX", "^TYX", "TLT", "IEF", "SHY", "HYG", "LQD"]),
     "MAG7": ("美股七雄 + 半導體", ["AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "AVGO", "TSM", "AMD",
                             "ASML", "MU", "INTC", "QCOM"]),
@@ -86,7 +86,8 @@ NAMES = {"^TWOII": "櫃買指數", "^GSPC": "S&P 500", "^DJI": "道瓊工業", "
          "2382.TW": "廣達", "3711.TW": "日月光投控", "2881.TW": "富邦金", "2882.TW": "國泰金", "2891.TW": "中信金",
          "2303.TW": "聯電", "2412.TW": "中華電", "3231.TW": "緯創", "6669.TW": "緯穎", "2603.TW": "長榮",
          "3661.TW": "世芯-KY", "BTC-USD": "Bitcoin", "ETH-USD": "Ethereum", "SOL-USD": "Solana",
-         "USDT-TWD": "USDT/TWD（MAX）", "BTC-TWD": "BTC/TWD（MAX）", "ETH-TWD": "ETH/TWD（MAX）"}
+         "USDT-TWD": "USDT/TWD（MAX）", "BTC-TWD": "BTC/TWD（MAX）", "ETH-TWD": "ETH/TWD（MAX）",
+         "USDT-TWD.BITO": "USDT/TWD（BitoPro）", "BTC-TWD.BITO": "BTC/TWD（BitoPro）", "ETH-TWD.BITO": "ETH/TWD（BitoPro）"}
 NAMES.update({k: v for k, v in sectors.US_ZH.items() if k not in NAMES})  # 美股中文名（監控表、自選）
 
 from ft_common.engine import _safe_json_response  # noqa: E402

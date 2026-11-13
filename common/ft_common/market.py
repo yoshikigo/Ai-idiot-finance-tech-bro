@@ -91,17 +91,20 @@ PERIOD_DAYS = {"1d": 1, "5d": 5, "1mo": 31, "3mo": 92, "6mo": 183, "ytd": None, 
                "2y": 731, "5y": 1827, "10y": 3653, "max": 10000}
 
 
-# ---------------------------------------------------------------- MAX（MaiCoin）台幣交易對：Yahoo 沒有，例如 USDT/TWD
-MAX_MARKETS = {"USDT-TWD": "usdttwd", "BTC-TWD": "btctwd", "ETH-TWD": "ethtwd"}
+# ---------------------------------------------------------------- 台灣交易所的台幣交易對：Yahoo 沒有，例如 USDT/TWD
+# 代號 → (交易所, 交易所的市場代號)。MAX（MaiCoin）用 XXX-TWD，BitoPro 用 XXX-TWD.BITO。
+TWX_MARKETS = {"USDT-TWD": ("max", "usdttwd"), "BTC-TWD": ("max", "btctwd"), "ETH-TWD": ("max", "ethtwd"),
+               "USDT-TWD.BITO": ("bito", "usdt_twd"), "BTC-TWD.BITO": ("bito", "btc_twd"), "ETH-TWD.BITO": ("bito", "eth_twd")}
+MAX_MARKETS = TWX_MARKETS  # 舊名
 MAX_API = "https://max-api.maicoin.com/api/v2/k"
-_MAX_PERIOD = {"1m": 1, "2m": 1, "5m": 5, "15m": 15, "30m": 30, "60m": 60, "90m": 60, "1h": 60,
-               "1d": 1440, "5d": 1440, "1wk": 10080, "1mo": 1440, "3mo": 1440}
+BITO_API = "https://api.bitopro.com/v3/trading-history/"
+_MINS = {"1m": 1, "2m": 1, "5m": 5, "15m": 15, "30m": 30, "60m": 60, "90m": 60, "1h": 60,
+         "1d": 1440, "5d": 1440, "1wk": 10080, "1mo": 1440, "3mo": 1440}
+_MAX_PERIOD = _MINS
+_BITO_RES = {1: "1m", 5: "5m", 15: "15m", 30: "30m", 60: "1h", 1440: "1d", 10080: "1w"}
 
 
-def _max_history(sym: str, period: str, interval: str, start: str | None, end: str | None) -> pd.DataFrame:
-    """OHLCV from MAX public k-line API (UTC+8 dates for daily bars, like the exchange's own chart)."""
-    import httpx
-    mins = _MAX_PERIOD.get(interval, 1440)
+def _twx_window(period: str, start: str | None, end: str | None):
     now = dt.datetime.now(dt.timezone.utc)
     t1 = dt.datetime.fromisoformat(end).replace(tzinfo=dt.timezone.utc) if end else now
     if start:
@@ -109,32 +112,64 @@ def _max_history(sym: str, period: str, interval: str, start: str | None, end: s
     else:
         days = PERIOD_DAYS.get(period)
         if days is None:
-            days = 3650 if period == "max" else (t1.date() - dt.date(t1.year, 1, 1)).days + 1
-        t0 = t1 - dt.timedelta(days=days + (3 if period in ("1d", "5d") else 0))
-    rows, ts = [], int(t0.timestamp())
-    while ts < t1.timestamp():
-        limit = min(10000, int((t1.timestamp() - ts) // (mins * 60)) + 2)
-        r = httpx.get(MAX_API, params={"market": MAX_MARKETS[sym], "period": mins, "limit": limit, "timestamp": ts},
-                      headers={"User-Agent": "fin-terminal"}, timeout=15)
-        r.raise_for_status()
-        batch = r.json()
+            days = (t1.date() - dt.date(t1.year, 1, 1)).days + 1
+        t0 = t1 - dt.timedelta(days=min(days, 3650) + (3 if period in ("1d", "5d") else 0))
+    return int(t0.timestamp()), int(t1.timestamp())
+
+
+def _twx_rows(ex: str, market: str, mins: int, t0: int, t1: int) -> list[list]:
+    """[[epoch_s, o, h, l, c, v], …] from the exchange's public k-line API (no key)."""
+    import httpx
+    H = {"User-Agent": "fin-terminal"}
+    rows, ts = [], t0
+    while ts < t1:
+        if ex == "max":
+            limit = min(10000, (t1 - ts) // (mins * 60) + 2)
+            r = httpx.get(MAX_API, params={"market": market, "period": mins, "limit": limit, "timestamp": ts},
+                          headers=H, timeout=15)
+            r.raise_for_status()
+            batch = [[int(x[0])] + [float(v) for v in x[1:6]] for x in r.json()]
+        else:
+            limit = 1000
+            te = min(t1, ts + limit * mins * 60)
+            r = httpx.get(BITO_API + market, params={"resolution": _BITO_RES.get(mins, "1d"), "from": ts, "to": te},
+                          headers=H, timeout=15)
+            r.raise_for_status()
+            batch = [[int(x["timestamp"]) // 1000, float(x["open"]), float(x["high"]), float(x["low"]), float(x["close"]),
+                      float(x["volume"])] for x in (r.json().get("data") or [])]
+            batch.sort()
+            rows += batch
+            ts = te + 1
+            continue
         if not batch:
             break
         rows += batch
         if len(batch) < limit:
             break
-        ts = int(batch[-1][0]) + mins * 60
+        ts = batch[-1][0] + mins * 60
+    return rows
+
+
+def _twx_history(sym: str, period: str, interval: str, start: str | None, end: str | None) -> pd.DataFrame:
+    ex, mk = TWX_MARKETS[sym]
+    mins = _MINS.get(interval, 1440)
+    t0, t1 = _twx_window(period, start, end)
+    rows = _twx_rows(ex, mk, mins, t0, t1)
     if not rows:
         return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
-    df = pd.DataFrame(rows, columns=["t", "Open", "High", "Low", "Close", "Volume"]).drop_duplicates("t")
-    idx = pd.to_datetime(df.pop("t"), unit="s", utc=True).dt.tz_convert("Asia/Taipei")
-    df.index = pd.DatetimeIndex(idx)
+    df = pd.DataFrame(rows, columns=["t", "Open", "High", "Low", "Close", "Volume"]).drop_duplicates("t", keep="last")
+    df = df[(df.t >= t0) & (df.t <= t1)].sort_values("t")
+    df.index = pd.DatetimeIndex(pd.to_datetime(df.pop("t"), unit="s", utc=True).dt.tz_convert("Asia/Taipei"))
     df = df.astype(float)
-    df = df[df.index <= pd.Timestamp(t1).tz_convert("Asia/Taipei")]
+    if ex == "bito":  # BitoPro 會補一根沒有成交的當期 K 棒（量 0、開高低收相同）：只在它是最後一根時保留
+        df = df[(df.Volume > 0) | (df.index == df.index[-1])]
     if interval in ("1mo", "3mo"):
         df = df.resample("MS" if interval == "1mo" else "QS").agg(
             {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}).dropna()
     return df
+
+
+_max_history = _twx_history  # 舊名
 
 
 def history(sym: str, period: str = "1y", interval: str = "1d", start: str | None = None,
@@ -152,8 +187,8 @@ def history(sym: str, period: str = "1y", interval: str = "1d", start: str | Non
                 days = PERIOD_DAYS.get(period) or (e - dt.date(e.year, 1, 1)).days
                 s = e - dt.timedelta(days=days + (3 if period in ("1d", "5d") else 0))
             return _fake_history(sym, s, e, interval)
-        if sym in MAX_MARKETS:
-            return _max_history(sym, period, interval, start, end)
+        if sym in TWX_MARKETS:
+            return _twx_history(sym, period, interval, start, end)
         t = _yf().Ticker(sym)
         if start:
             df = t.history(start=start, end=end, interval=interval, auto_adjust=True)
@@ -223,8 +258,9 @@ def quotes(symbols: list[str]) -> list[dict]:
                    "high": _f(df["High"].iloc[-1]), "low": _f(df["Low"].iloc[-1]),
                    "volume": _f(df["Volume"].iloc[-1]),
                    "time": pd.Timestamp(df.index[-1]).isoformat()}
-            if sym in MAX_MARKETS:
+            if sym in TWX_MARKETS:
                 row["currency"] = "TWD"
+                row["exchange"] = {"max": "MAX", "bito": "BitoPro"}[TWX_MARKETS[sym][0]]
             elif not FAKE:
                 try:
                     fi = _yf().Ticker(sym).fast_info
