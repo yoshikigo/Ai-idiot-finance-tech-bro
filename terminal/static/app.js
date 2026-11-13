@@ -129,7 +129,7 @@ async function boot() {
     let c0 = null;
     try { c0 = JSON.parse(localStorage.getItem("ft.pane0c") || "null"); } catch (e) {}
     S.panes[0] = { range: "1y", ...(c0 || { fn: "FOCUS", sec: "" }) };
-    try { S.ask = JSON.parse(localStorage.getItem("ft.ask") || "[]").filter((m) => m && m.role); } catch (e) { S.ask = []; }
+    try { S.ask = JSON.parse(localStorage.getItem("ft.ask") || "[]").filter((m) => m && m.role && !(m.pending && !m.content)).map((m) => { delete m.pending; return m; }); } catch (e) { S.ask = []; }
     document.body.classList.add("clean");
   }
   applyColors();
@@ -2081,21 +2081,29 @@ function renderAsk(body) {
 function msgEl(m) {
   if (m.role === "job") return jobCard(m);
   const b = h("div", { class: "body " + (m.role === "assistant" ? "md" : "") });
-  if (m.role === "assistant") b.innerHTML = md(m.content); else b.textContent = m.content;
-  return h("div", { class: "msg " + m.role }, h("div", { class: "who" }, m.role === "user" ? "YOU" : "OLLAMA"), b);
+  if (m.role === "assistant") b.innerHTML = m.content ? md(m.content) : m.pending ? waitHtml(m) : ""; else b.textContent = m.content;
+  return h("div", { class: "msg " + m.role, "data-mid": m.id || "" }, h("div", { class: "who" }, m.role === "user" ? "YOU" : "OLLAMA"), b);
 }
 
 async function askSend(text) {
   if (S.sideTab !== "ask") openSide("ask");
   S.ask.push({ role: "user", content: text });
-  const reply = { role: "assistant", content: "" };
+  const reply = { role: "assistant", content: "", id: "a" + Date.now(), pending: true, t0: Date.now(), stage: "整理市場資料" };
   S.ask.push(reply);
   renderSide();
-  const logEl = $("#askLog"); const node = logEl.lastChild; const bodyEl = $(".body", node);
-  bodyEl.innerHTML = `<span class="loading"></span>`;
+  // 側欄可能在回覆途中重畫（工作卡片更新、切換頁面），所以每次都依 id 找目前畫面上的那則訊息
+  const paint = () => {
+    const n = document.querySelector(`[data-mid="${reply.id}"] .body`);
+    if (!n) return;
+    n.innerHTML = reply.content ? md(reply.content) : waitHtml(reply);
+    const log = $("#askLog"); if (log && reply.content) log.scrollTop = log.scrollHeight;
+  };
+  const tick = setInterval(() => { if (!reply.content) paint(); }, 1000);
   try {
     const r = await fetch("/api/ask", { method: "POST", headers: { "content-type": "application/json" },
-      body: JSON.stringify({ messages: S.ask.slice(0, -1).filter((m) => m.role === "user" || m.role === "assistant").map((m) => ({ role: m.role, content: m.content })), security: S.panes[S.focus].sec || null }) });
+      body: JSON.stringify({ messages: S.ask.filter((m) => m !== reply && (m.role === "user" || m.role === "assistant")).map((m) => ({ role: m.role, content: m.content })), security: S.panes[S.focus].sec || null }) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    reply.stage = "AI 思考中（本機模型，常要一兩分鐘）"; paint();
     const reader = r.body.getReader(); const dec = new TextDecoder(); let buf = "";
     for (;;) {
       const { value, done } = await reader.read(); if (done) break;
@@ -2105,12 +2113,20 @@ async function askSend(text) {
         const line = buf.slice(0, k); buf = buf.slice(k + 2);
         if (!line.startsWith("data:")) continue;
         const d = JSON.parse(line.slice(5));
-        if (d.t) { reply.content += d.t; bodyEl.innerHTML = md(reply.content); logEl.scrollTop = logEl.scrollHeight; }
-        if (d.error) { reply.content += `\n\n**錯誤**：${d.error}`; bodyEl.innerHTML = md(reply.content); }
+        if (d.t) { reply.content += d.t; paint(); }
+        if (d.error) { reply.content += `\n\n**錯誤**：${d.error}`; paint(); }
       }
     }
-  } catch (e) { reply.content += `\n\n**錯誤**：${e.message}`; bodyEl.innerHTML = md(reply.content); }
+  } catch (e) { reply.content += `\n\n**錯誤**：${e.message}`; }
+  clearInterval(tick);
+  delete reply.pending;
+  if (!reply.content.trim()) reply.content = "（AI 沒有回覆內容，請再試一次）";
+  paint();
   saveAsk();
+}
+
+function waitHtml(m) {
+  return `<span class="loading ask-wait">${esc(m.stage || "AI 思考中")} · ${Math.round((Date.now() - (m.t0 || Date.now())) / 1000)} 秒</span>`;
 }
 
 /* ---------- settings */

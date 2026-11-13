@@ -453,6 +453,33 @@ TW_MACRO_HINTS = ("總經", "經濟", "景氣", "通膨", "CPI", "物價", "失�
 WORLD_WORDS = ("世界", "地緣", "地震", "戰", "軍", "航運", "船", "油價", "颱風", "颶風", "海峽", "事件", "風險", "紅海",
                "荷莫茲", "南海", "供應鏈", "天災", "衝突")
 
+def fx_reading(sym: str) -> str:
+    """How a Yahoo FX quote reads, so the model doesn't mix up USD/TWD and JPY/TWD."""
+    import re as _re
+    if sym == "TWD=X":
+        return "報價＝1 美元可換多少新台幣；數字變小＝台幣升值（同樣台幣換到更多美元）"
+    m = _re.fullmatch(r"([A-Z]{3})TWD=X", sym)
+    if m:
+        return f"報價＝1 {m.group(1)} 值多少新台幣；數字變小＝{m.group(1)} 變便宜、同樣台幣換到更多 {m.group(1)}"
+    m = _re.fullmatch(r"([A-Z]{3})([A-Z]{3})=X", sym)
+    if m:
+        return f"報價＝1 {m.group(1)} 值多少 {m.group(2)}"
+    m = _re.fullmatch(r"([A-Z]{3})=X", sym)
+    if m:
+        return f"報價＝1 美元值多少 {m.group(1)}"
+    if sym in market.TWX_MARKETS or sym.endswith("-TWD"):
+        a = sym.split("-")[0]
+        return f"報價＝1 {a} 值多少新台幣（台灣交易所成交價）"
+    return ""
+
+
+def focus_line(sec: str) -> str:
+    name = NAMES.get(sec) or twmarket.zh_name(sec) or ""
+    rd = fx_reading(sec)
+    return (f"【使用者目前正在看：{sec}{(' ' + name) if name else ''}】問題沒有指明標的時，就是在問它；"
+            f"其他標的的段落只是背景，不要拿來代替它。" + (f"\n{rd}。" if rd else ""))
+
+
 @app.post("/api/ask")
 async def api_ask(req: Request):
     body = await req.json()
@@ -566,6 +593,8 @@ async def api_ask(req: Request):
                 parts.append(b["text"])
         except Exception:  # noqa: BLE001
             pass
+    if sec:
+        parts.insert(0, focus_line(sec))
     ctx_text = "\n\n".join(parts)
     system = (ollama.RULES_ZH + "你是專業金融終端機裡的市場分析師。回答精確、簡潔，引用下方提供的數字；資料缺漏要明講，絕不編造價格或淨值。"
               "台股漲跌以紅漲綠跌的習慣描述即可，金額單位用元、億元。不構成投資建議。"
