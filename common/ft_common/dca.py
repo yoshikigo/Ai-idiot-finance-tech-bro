@@ -82,7 +82,7 @@ def currency_of(sym: str) -> str:
             return (funds.get(sym[5:]) or {}).get("currency") or "TWD"
         except Exception:  # noqa: BLE001
             return "TWD"
-    if sym.endswith((".TW", ".TWO")) or sym in ("^TWII", "^TWOII"):
+    if sym.endswith((".TW", ".TWO", "-TWD")) or sym in ("^TWII", "^TWOII"):
         return "TWD"
     if sym.endswith(".T"):
         return "JPY"

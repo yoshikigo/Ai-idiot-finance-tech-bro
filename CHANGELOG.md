@@ -2,6 +2,14 @@
 
 各版本新增功能的詳細說明（新的在上面）。使用方式請看 [README](README.md)。
 
+## 🪙 USDT/TWD（2026.11.13-50）
+
+- 加密貨幣頁新增 **USDT/TWD**。Yahoo 沒有這個交易對，改抓台灣交易所 MAX（MaiCoin）的公開 K 線 `max-api.maicoin.com/api/v2/k`（日線與 1／5／15／30／60 分線，不用 API key），報價、走勢圖、定期定額回測都能用；幣別直接是台幣。
+- 同一套也支援 `BTC-TWD`、`ETH-TWD`（命令列輸入代號即可）。
+- 測試 `tests/test_max_market.py`。
+
+升級：`./install.sh terminal`。
+
 ## ⚖️ skfolio：組合體檢、定期定額分配、策略權重、PBO（2026.11.08-48）
 
 加入 [skfolio](https://github.com/skfolio/skfolio)（BSD-3，1.12.7）。只用不需要預測報酬的方法（等權重、反波動率、風險平價、HRP、最小 CVaR），避免均值–變異數的權重被估計誤差帶著跑。

@@ -91,6 +91,52 @@ PERIOD_DAYS = {"1d": 1, "5d": 5, "1mo": 31, "3mo": 92, "6mo": 183, "ytd": None, 
                "2y": 731, "5y": 1827, "10y": 3653, "max": 10000}
 
 
+# ---------------------------------------------------------------- MAX（MaiCoin）台幣交易對：Yahoo 沒有，例如 USDT/TWD
+MAX_MARKETS = {"USDT-TWD": "usdttwd", "BTC-TWD": "btctwd", "ETH-TWD": "ethtwd"}
+MAX_API = "https://max-api.maicoin.com/api/v2/k"
+_MAX_PERIOD = {"1m": 1, "2m": 1, "5m": 5, "15m": 15, "30m": 30, "60m": 60, "90m": 60, "1h": 60,
+               "1d": 1440, "5d": 1440, "1wk": 10080, "1mo": 1440, "3mo": 1440}
+
+
+def _max_history(sym: str, period: str, interval: str, start: str | None, end: str | None) -> pd.DataFrame:
+    """OHLCV from MAX public k-line API (UTC+8 dates for daily bars, like the exchange's own chart)."""
+    import httpx
+    mins = _MAX_PERIOD.get(interval, 1440)
+    now = dt.datetime.now(dt.timezone.utc)
+    t1 = dt.datetime.fromisoformat(end).replace(tzinfo=dt.timezone.utc) if end else now
+    if start:
+        t0 = dt.datetime.fromisoformat(start).replace(tzinfo=dt.timezone.utc)
+    else:
+        days = PERIOD_DAYS.get(period)
+        if days is None:
+            days = 3650 if period == "max" else (t1.date() - dt.date(t1.year, 1, 1)).days + 1
+        t0 = t1 - dt.timedelta(days=days + (3 if period in ("1d", "5d") else 0))
+    rows, ts = [], int(t0.timestamp())
+    while ts < t1.timestamp():
+        limit = min(10000, int((t1.timestamp() - ts) // (mins * 60)) + 2)
+        r = httpx.get(MAX_API, params={"market": MAX_MARKETS[sym], "period": mins, "limit": limit, "timestamp": ts},
+                      headers={"User-Agent": "fin-terminal"}, timeout=15)
+        r.raise_for_status()
+        batch = r.json()
+        if not batch:
+            break
+        rows += batch
+        if len(batch) < limit:
+            break
+        ts = int(batch[-1][0]) + mins * 60
+    if not rows:
+        return pd.DataFrame(columns=["Open", "High", "Low", "Close", "Volume"])
+    df = pd.DataFrame(rows, columns=["t", "Open", "High", "Low", "Close", "Volume"]).drop_duplicates("t")
+    idx = pd.to_datetime(df.pop("t"), unit="s", utc=True).dt.tz_convert("Asia/Taipei")
+    df.index = pd.DatetimeIndex(idx)
+    df = df.astype(float)
+    df = df[df.index <= pd.Timestamp(t1).tz_convert("Asia/Taipei")]
+    if interval in ("1mo", "3mo"):
+        df = df.resample("MS" if interval == "1mo" else "QS").agg(
+            {"Open": "first", "High": "max", "Low": "min", "Close": "last", "Volume": "sum"}).dropna()
+    return df
+
+
 def history(sym: str, period: str = "1y", interval: str = "1d", start: str | None = None,
             end: str | None = None) -> pd.DataFrame:
     """OHLCV DataFrame indexed by timestamp (adjusted prices)."""
@@ -106,6 +152,8 @@ def history(sym: str, period: str = "1y", interval: str = "1d", start: str | Non
                 days = PERIOD_DAYS.get(period) or (e - dt.date(e.year, 1, 1)).days
                 s = e - dt.timedelta(days=days + (3 if period in ("1d", "5d") else 0))
             return _fake_history(sym, s, e, interval)
+        if sym in MAX_MARKETS:
+            return _max_history(sym, period, interval, start, end)
         t = _yf().Ticker(sym)
         if start:
             df = t.history(start=start, end=end, interval=interval, auto_adjust=True)
@@ -175,7 +223,9 @@ def quotes(symbols: list[str]) -> list[dict]:
                    "high": _f(df["High"].iloc[-1]), "low": _f(df["Low"].iloc[-1]),
                    "volume": _f(df["Volume"].iloc[-1]),
                    "time": pd.Timestamp(df.index[-1]).isoformat()}
-            if not FAKE:
+            if sym in MAX_MARKETS:
+                row["currency"] = "TWD"
+            elif not FAKE:
                 try:
                     fi = _yf().Ticker(sym).fast_info
                     lp = _f(fi.get("lastPrice") if hasattr(fi, "get") else fi.last_price)
